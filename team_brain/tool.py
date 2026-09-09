@@ -4,10 +4,31 @@ import argparse
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 
 from .contracts import BrainError, fields, require, strict_json
 from .feishu import NoRedirect
+
+
+def sandbox_opener():
+    # Match the existing gateway client transport: sandbox loopback is reached
+    # through Claude's local HTTP proxy, not a direct network connection.
+    proxy = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY", "")
+    try:
+        parsed = urllib.parse.urlsplit(proxy)
+        valid = (parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+                 and parsed.port and not parsed.username and not parsed.password
+                 and parsed.path in ("", "/") and not parsed.query and not parsed.fragment
+                 and all(32 < ord(c) < 127 for c in proxy))
+    except ValueError:
+        valid = False
+    require(valid, "sandbox_proxy_required")
+    # The native shell excludes localhost by default. Remove bypass only in
+    # this short-lived client; the parent sandbox and its policy stay intact.
+    os.environ.pop("NO_PROXY", None)
+    os.environ.pop("no_proxy", None)
+    return urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy}), NoRedirect())
 
 
 def main():
@@ -27,11 +48,11 @@ def main():
         require(not (session and shared_session and session != shared_session), "conflicting_host_session")
         session = session or shared_session
         require(session, "no_host_session")
-        # Fixed loopback endpoint, no proxy or redirects carrying the session token.
+        # Fixed gateway endpoint; only the validated native proxy can carry it.
         request = urllib.request.Request("http://127.0.0.1:18743/tool", method="POST",
                   headers={"Authorization": "Bearer " + session, "Content-Type": "application/json"},
                   data=json.dumps({"command": args.command, "input": value}).encode())
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+        opener = sandbox_opener()
         with opener.open(request, timeout=35) as response:
             result = response.read(2_000_001)
             require(len(result) <= 2_000_000, "response_too_large")
