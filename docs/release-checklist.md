@@ -17,12 +17,14 @@
 | 原生调用 | 用途 | 需审核的权限与资源条件 |
 | --- | --- | --- |
 | `POST /search/v2/doc_wiki/search` | 团队文档检索 | `search:docs:read`；应用可见的团队空间 |
-| `GET /wiki/v2/spaces/get_node`、`GET /wiki/v2/spaces/:space_id/nodes` | 解析节点与创建后核对 | Wiki 节点读取权限；目标空间可读 |
-| `GET /docx/v1/documents/:id`、`/raw_content`、`/blocks` | 正文及版本读取 | Docx 只读权限；目标文档可读 |
+| `GET /wiki/v2/spaces/get_node`、`GET /wiki/v2/spaces/:space_id/nodes` | 解析节点与创建后核对 | `wiki:node:read`（或既有 `wiki:wiki:readonly`）；目标空间可读 |
+| `GET /docx/v1/documents/:id`、`/raw_content`、`/blocks` | 正文及版本读取 | `docx:document:readonly`；目标文档可读 |
 | `POST /wiki/v2/spaces/:space_id/nodes` | 创建正式页面 | `wiki:node:create`；固定父节点可编辑 |
 | `POST /docx/v1/documents/:id/blocks/:parent/children`、`PATCH /blocks/:block` | 追加或局部修改正文 | Docx 正文写入权限；目标文档可编辑 |
 
 飞书后台展示的具体可选 scope 以届时应用的接口权限页为准，先列出现有与缺失项给用户核对。本轮未查询或改变真实应用授权。不要使用会附带授予 full_access 的 CLI 创建封装。没有删除、权限管理、跨空间移动或全员聊天读取能力需求。
+
+Wiki 节点读取/创建 scope 与 Docx token 的 `obj_type=docx` 参数已用本机官方 CLI 的只读 schema 核对；未调用任何租户业务接口。Docx 写入的最小 scope 名称仍需在目标应用的接口权限页核对后填入批准记录，不能据这张能力表直接申请整套云文档权限。
 
 接口依据：[统一搜索](https://open.feishu.cn/document/server-docs/search-v2/doc_wiki/search)、[获取知识空间节点](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/get_node)、[创建节点](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/create)、[创建块](https://open.feishu.cn/document/server-docs/docs/docx-v1/document-block-children/create)、[更新块](https://open.feishu.cn/document/server-docs/docs/docx-v1/document-block/patch)。Docx revision 不是严格比较并交换锁；client_token 不被当作无限期幂等保证。
 

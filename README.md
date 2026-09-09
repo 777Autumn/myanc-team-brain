@@ -17,7 +17,7 @@ scoped model tools. Runtime uses Python 3.11+ with no third-party dependencies.
 python -m unittest discover -s tests -v
 ```
 
-- [Eight review drafts](drafts/01-team-and-boundaries.md)
+- [Eight review drafts](drafts/README.md)
 - [Tool protocol](docs/tools.md) and [bot skill](skills/team-brain/SKILL.md)
 - [Release checklist and recovery](docs/release-checklist.md)
 
