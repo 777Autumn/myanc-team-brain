@@ -235,6 +235,22 @@ class Lifecycle(unittest.TestCase):
         with self.assertRaisesRegex(BrainError, "page_paused"):
             self.proposal(value)
 
+    def test_title_change_during_write_cannot_be_marked_verified(self):
+        node = self.publish()
+        self.read(node)
+        value = material("新的原话。")
+        value["target"] = node
+        identifier = self.proposal(value)
+        self.approve(identifier)
+        append = self.api.append
+        def concurrent_rename(*args):
+            append(*args)
+            self.api.pages[node]["title"] = "管理员同时修改标题"
+        self.api.append = concurrent_rename
+        self.assertEqual(self.brain.execute(identifier, self.callback)["status"], "unknown")
+        with self.assertRaisesRegex(BrainError, "concurrent_edit_detected"):
+            self.brain.reconcile(identifier)
+
     def test_document_urls_stay_within_registered_wiki_scope(self):
         node = self.publish()
         for path in ("wiki/", "docx/"):

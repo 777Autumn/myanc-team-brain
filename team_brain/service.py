@@ -215,6 +215,7 @@ class Brain:
         return self.result(p)
 
     def verify(self, p, snapshot):
+        require(snapshot["title"] == p["title"], "concurrent_edit_detected")
         blocks = self.api.text_blocks(snapshot)
         if p["block_id"]:
             require(blocks.get(p["block_id"]) == p["content"], "write_unverified")

@@ -1,9 +1,9 @@
 # v1 开发验证记录（2026-09-09）
 
-知识库代码提交 `d8a19fc0746c2026753c19725679324441dab32b`，对应 [PR #1](https://github.com/77AutumN/myanc-team-brain/pull/1)。后续文档提交不代表更换已验证的运行代码。
+知识库对应 [PR #1](https://github.com/77AutumN/myanc-team-brain/pull/1)，运行版本以最终合并提交为准。
 
-- Python unittest 共 26 项：Linux 26 项通过；Windows 24 项通过，2 项 POSIX 宿主权限测试跳过。
-- Python 3.11、3.13 × Linux、Windows 的四组合测试、compileall、wheel 构建均通过：[该提交 CI](https://github.com/77AutumN/myanc-team-brain/actions/runs/34338386140)。
+- 最终 Python unittest 共 27 项（含标题并发变化回归）；Windows 有 2 项 POSIX 宿主权限测试跳过，Linux 执行全部用例。
+- Python 3.11、3.13 × Linux、Windows 的四组合测试、compileall、wheel 构建均已通过一轮 26 项版本：[验证记录](https://github.com/77AutumN/myanc-team-brain/actions/runs/34338386140)。新增标题并发用例后，以 PR 最终提交 CI 的 27 项结果为准。
 - 覆盖事实引文、来源缺口、客户分离、账号/员工和 Excel/API 的混淆、私有页面和未发布内容排除、六身份复用、精确卡片、重复/过期确认、局部更新、并发、人工修改暂停、创建/写入超时、部分写入、进程重启恢复。
 - 独立 Spec/Standards 静态审查已完成。发现的并发卡住、预览缺少目标、错误诊断和配置测试问题均已修正并补用例。
 
