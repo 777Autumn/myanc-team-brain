@@ -16,17 +16,17 @@
 
 | 原生调用 | 用途 | 需审核的权限与资源条件 |
 | --- | --- | --- |
-| `POST /search/v2/doc_wiki/search` | 团队文档检索 | `search:docs:read`；应用可见的团队空间 |
+| 已登记页面逐页读取并匹配关键词 | 团队文档检索 | 复用下列 Wiki/Docx 读取权限，不新增搜索 scope 或个人 OAuth |
 | `GET /wiki/v2/spaces/get_node`、`GET /wiki/v2/spaces/:space_id/nodes` | 解析节点与创建后核对 | `wiki:node:read`（或既有 `wiki:wiki:readonly`）；目标空间可读 |
 | `GET /docx/v1/documents/:id`、`/raw_content`、`/blocks` | 正文及版本读取 | `docx:document:readonly`；目标文档可读 |
 | `POST /wiki/v2/spaces/:space_id/nodes` | 创建正式页面 | `wiki:node:create`；固定父节点可编辑 |
-| `POST /docx/v1/documents/:id/blocks/:parent/children`、`PATCH /blocks/:block` | 追加或局部修改正文 | Docx 正文写入权限；目标文档可编辑 |
+| `POST /docx/v1/documents/:id/blocks/:parent/children`、`PATCH /blocks/:block` | 追加或局部修改正文 | `docx:document:write_only`（或既有 `docx:document`）；目标文档可编辑 |
 
 飞书后台展示的具体可选 scope 以届时应用的接口权限页为准，先列出现有与缺失项给用户核对。本轮未查询或改变真实应用授权。不要使用会附带授予 full_access 的 CLI 创建封装。没有删除、权限管理、跨空间移动或全员聊天读取能力需求。
 
-Wiki 节点读取/创建 scope 与 Docx token 的 `obj_type=docx` 参数已用本机官方 CLI 的只读 schema 核对；未调用任何租户业务接口。Docx 写入的最小 scope 名称仍需在目标应用的接口权限页核对后填入批准记录，不能据这张能力表直接申请整套云文档权限。
+Wiki 节点读取/创建 scope 与 Docx token 的 `obj_type=docx` 参数已用本机官方 CLI 的只读 schema 核对。Docx 写入的最小 scope 已通过官方 Markdown 文档核对。当前配置仍未绑定真实空间，后台权限勾选不等于目标资源可读写；具体应用的既有/缺失权限由独立接入记录保存，不将真实标识提交到仓库。
 
-接口依据：[统一搜索](https://open.feishu.cn/document/server-docs/search-v2/doc_wiki/search)、[获取知识空间节点](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/get_node)、[创建节点](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/create)、[创建块](https://open.feishu.cn/document/server-docs/docs/docx-v1/document-block-children/create)、[更新块](https://open.feishu.cn/document/server-docs/docs/docx-v1/document-block/patch)。Docx revision 不是严格比较并交换锁；client_token 不被当作无限期幂等保证。
+接口依据：[Wiki 搜索要求用户身份](https://open.feishu.cn/document/server-docs/docs/wiki-v2/search_wiki.md)、[获取知识空间节点](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/get_node)、[创建节点](https://open.feishu.cn/document/server-docs/docs/wiki-v2/space-node/create)、[创建块](https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document-block/create.md)、[更新块](https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document-block/patch.md)。之前的统一搜索契约未获核实，不能据替身测试判定它支持应用身份。Docx revision 不是严格比较并交换锁；client_token 不被当作无限期幂等保证。
 
 ## 待安装文件与隔离
 

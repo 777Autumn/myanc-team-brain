@@ -56,19 +56,31 @@ class Brain:
     def tool(self, command, value, principal, session_token):
         owner = self.owner(principal, session_token)
         if command == "knowledge_search":
-            fields(value, ("query", "subject"))
+            fields(value, ("query", "subject"), ("after",))
             text(value["query"], 200)
             text(value["subject"], 100)
-            results = []
-            for node in self.api.search(value["query"]):
+            terms = value["query"].casefold().split()
+            require(terms, "invalid_query")
+            after = token(value["after"]) if "after" in value else ""
+            pages = self.journal.search_pages(value["subject"], after)
+            results, skipped = [], 0
+            # ponytail: scan five approved pages per call, no index or OAuth.
+            # Add a measured index only when corpus size or latency warrants it.
+            for node in pages[:5]:
                 try:
-                    snapshot = self.readable(node, value["subject"])
-                    results.append({key: snapshot[key] for key in ("node_token", "title", "url")})
+                    require(not self.journal.locked(node), "page_busy")
+                    snapshot = self.api.search_text(node)
+                    require(not self.journal.locked(node), "page_busy")
+                    content = (snapshot["title"] + "\n" + snapshot["text"]).casefold()
+                    if all(term in content for term in terms):
+                        results.append({key: snapshot[key] for key in ("node_token", "title", "url")})
                 except BrainError as exc:
                     if exc.code not in ("page_not_published", "subject_mismatch", "page_busy", "outside_team_scope"):
                         raise
+                    skipped += 1
             return {"status": "ok", "sources": results,
-                    "coverage": "Up to 20 search hits, filtered to published team pages. Empty results do not prove absence."}
+                    "next_after": pages[4] if len(pages) > 5 else None, "skipped_pages": skipped,
+                    "coverage": "Keyword match in up to five registered pages per call; follow next_after with the same query and subject. No semantic matching, OCR or attachments. Empty results do not prove absence."}
         if command == "knowledge_read":
             fields(value, ("subject",), ("node_token", "reference"))
             require(("node_token" in value) != ("reference" in value))

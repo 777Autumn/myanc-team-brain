@@ -39,6 +39,24 @@ class FeishuBoundary(unittest.TestCase):
         self.assertEqual(calls[2][3], {"client_token":"stable-id", "document_revision_id":9})
         self.assertEqual(calls[3][3], {"token":"doc", "obj_type":"docx"})
 
+    def test_search_discovery_uses_scoped_docx_read_not_user_search_api(self):
+        api = self.client()
+        checked = []
+        calls = []
+        def scope(node):
+            checked.append(node)
+            return {"obj_token": "doc", "title": "Synthetic"}
+        def request(method, path, body=None, params=None):
+            calls.append((method, path, body))
+            return {"content": "Excel export only"}
+        api.scoped_node = scope
+        api.request = request
+        result = api.search_text("node")
+        self.assertEqual(checked, ["node"])
+        self.assertEqual(calls, [("GET", "/docx/v1/documents/doc/raw_content", None)])
+        self.assertEqual(result["text"], "Excel export only")
+        self.assertEqual(result["url"], "https://synthetic.feishu.cn/wiki/node")
+
     def test_document_revision_change_is_not_a_stable_read(self):
         api = self.client()
         api.scoped_node = lambda _: {"obj_token":"doc", "title":"Synthetic"}
