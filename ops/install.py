@@ -206,7 +206,12 @@ class Release:
                 '-o', 'json', '--no-pager']).splitlines() if line]
 
     def startup_journal(self, receipt):
-        return [record for line in run(['journalctl', '-u', SERVICE, '--since', receipt['start_requested_at'],
+        started = datetime.datetime.fromisoformat(receipt['start_requested_at'])
+        require(started.tzinfo is not None, 'startup_time_requires_timezone')
+        # journalctl on the deployed distro rejects ISO timestamps with +00:00.
+        # Round down, never forward, so even the first process remains in scope.
+        since = started.astimezone(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+        return [record for line in run(['journalctl', '-u', SERVICE, '--since', since,
                 '-o', 'json', '--no-pager']).splitlines() if line
                 for record in [json.loads(line)] if record.get('_COMM') == 'cc-connect-anc']
 
