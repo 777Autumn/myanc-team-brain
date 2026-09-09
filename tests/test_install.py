@@ -14,15 +14,19 @@ def log(event, second, message=''):
             '__REALTIME_TIMESTAMP': str(second * 1000000)}
 
 
+def boundary(pid=''):
+    return dict(log('config loaded', 1), MESSAGE='msg="config loaded" path=' + json.dumps(str(install.CONFIG)), _PID=pid)
+
+
 class Quiescence(unittest.TestCase):
     def test_completed_turn_must_also_be_quiet(self):
-        records = [log('engine started', 1), log('message received', 10, 'one'), log('turn complete', 20, 'one')]
+        records = [boundary(), log('message received', 10, 'one'), log('turn complete', 20, 'one')]
         self.assertEqual(install.activity(records, 141)['received'], 1)
         with self.assertRaisesRegex(RuntimeError, 'receiver_not_quiet'):
             install.activity(records, 139)
 
     def test_command_exception_requires_exact_reviewed_event(self):
-        records = [log('engine started', 1), log('message received', 10, 'help')]
+        records = [boundary(), log('message received', 10, 'help')]
         evidence = [dict(message_id='help', received_at=10000000, evidence='Reviewed synchronous reply')]
         with self.assertRaisesRegex(RuntimeError, 'event_review'):
             install.activity(records, 200)
@@ -36,7 +40,7 @@ class Quiescence(unittest.TestCase):
         for records in ([], [log('unrelated', 10)]):
             with self.assertRaises(RuntimeError):
                 install.activity(records, 200)
-        self.assertEqual(install.activity([log('engine started', 10)], 200)['received'], 0)
+        self.assertEqual(install.activity([boundary()], 200)['received'], 0)
 
     def test_completed_pair_without_startup_boundary_is_incomplete(self):
         with self.assertRaisesRegex(RuntimeError, 'incomplete_receiver_journal'):
@@ -49,8 +53,17 @@ class Quiescence(unittest.TestCase):
         records[-1]['MESSAGE'] = 'msg="engine started with partial readiness" project=' + projects[-1]
         self.assertFalse(install.engine_ready(records, projects))
         with self.assertRaisesRegex(RuntimeError, 'incomplete_receiver_journal'):
-            install.activity(records[:-1], 200, projects=projects)
+            install.activity(records[:-1], 200)
         self.assertFalse(install.engine_ready(records[:5] + [records[0]], projects))
+
+    def test_restarts_and_partial_startup_can_be_idle_but_each_pid_needs_boundary(self):
+        records = [boundary('111'), boundary('222')]
+        for pid in ('111', '222'):
+            records.extend(dict(log('engine started', 2), _PID=pid) for _ in range(6))
+        records.append(dict(log('engine started with partial readiness', 3), _PID='222'))
+        self.assertEqual(install.activity(records, 200)['received'], 0)
+        with self.assertRaisesRegex(RuntimeError, 'incomplete_receiver_journal'):
+            install.activity(records[1:], 200)
 
 
 class ReleaseGates(unittest.TestCase):

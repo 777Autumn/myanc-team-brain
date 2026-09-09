@@ -97,11 +97,15 @@ def engine_ready(records, projects):
             and not any(event.get('msg') == 'engine started with partial readiness' for event in events))
 
 
-def activity(records, now, reviewed=(), projects=()):
+def activity(records, now, reviewed=()):
     require(records, 'missing_receiver_journal')
     received, completed, processing, last = {}, {}, set(), 0
+    process_boundaries = {}
     for record in records:
         fields = log_fields(record)
+        boundaries = process_boundaries.setdefault(record.get('_PID', ''), 0)
+        if fields.get('msg') == 'config loaded' and fields.get('path') == str(CONFIG):
+            process_boundaries[record.get('_PID', '')] = boundaries + 1
         event, message_id = fields.get('msg'), fields.get('msg_id')
         stamp = int(record['__REALTIME_TIMESTAMP'])
         if event in ('message received', 'turn complete'):
@@ -118,8 +122,9 @@ def activity(records, now, reviewed=(), projects=()):
     unresolved = [key for key, stamp in received.items() if completed.get(key, 0) <= stamp
                   and not (key not in processing and (key, stamp) in exceptions)]
     require(not unresolved, 'unfinished_message_requires_event_review')
-    require(engine_ready(records, projects) if projects else
-            any(log_fields(r).get('msg') == 'engine started' for r in records), 'incomplete_receiver_journal')
+    # config loaded precedes all engine creation/ingress. Require that boundary
+    # for each PID; partial startup can safely roll back, rotated logs cannot.
+    require(all(count == 1 for count in process_boundaries.values()), 'incomplete_receiver_journal')
     require(now - last / 1e6 >= 120, 'receiver_not_quiet')
     return {'last_activity': last, 'received': len(received), 'completed': len(completed)}
 
@@ -229,8 +234,7 @@ class Release:
             require(path == GATEWAY or not path.exists(), 'new_file_already_exists:' + str(path))
         require(not STATE.exists() and not STATE.is_symlink(), 'knowledge_state_already_exists')
         crm_idle(self.plan['crm_ledgers'])
-        return activity(self.journal(self.plan['old_pid']), time.time(), self.plan.get('completed_without_turn', ()),
-                        [p['name'] for p in self.projects])
+        return activity(self.journal(self.plan['old_pid']), time.time(), self.plan.get('completed_without_turn', ()))
 
     def prepare(self):
         require(not self.receipt_path.exists(), 'existing_release_receipt')
@@ -278,8 +282,7 @@ class Release:
         receipt = self.receipt()
         require(receipt['phase'] == 'prepared', 'install_not_prepared_or_already_started')
         self.stopped()
-        require(activity(self.journal(self.plan['old_pid']), time.time(), self.plan.get('completed_without_turn', ()),
-                         [p['name'] for p in self.projects]) == receipt['activity'], 'message_raced_with_stop')
+        require(activity(self.journal(self.plan['old_pid']), time.time(), self.plan.get('completed_without_turn', ())) == receipt['activity'], 'message_raced_with_stop')
         self.preserved()
         crm_idle(self.plan['crm_ledgers'])
         require(sha(GATEWAY.read_bytes()) == self.plan['old_gateway_sha256'], 'gateway_changed')
@@ -370,7 +373,7 @@ class Release:
         if receipt.get('start_requested_at'):
             # Include every receiver PID since the attempt, including restarts or
             # a process that started before its PID could be saved in the receipt.
-            activity(self.startup_journal(receipt), time.time(), projects=[p['name'] for p in self.projects])
+            activity(self.startup_journal(receipt), time.time())
         # Unknown operations and even partially initialized journals are retained
         # verbatim. Restoring the old receiver disables knowledge execution.
         self.preserved()
