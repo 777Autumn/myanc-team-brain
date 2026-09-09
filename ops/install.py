@@ -174,7 +174,7 @@ class Release:
         allowed = {str(GATEWAY), str(DROPIN), '/usr/local/libexec/team-brain-host', '/usr/local/bin/team-brain-tool'}
         for project in self.projects:
             workspace = project['agent']['options']['work_dir']
-            allowed.update((workspace + '/.claude/skills/team-brain/SKILL.md', workspace + '/.claude/docs/tools.md'))
+            allowed.update((workspace + '/.claude/skills/team-brain/SKILL.md', workspace + '/.claude/skills/team-brain/references/tools.md'))
         for item in self.plan['files']:
             target = item['target']
             is_code = target.startswith(self.prefix + '/') and target.endswith('.py')
