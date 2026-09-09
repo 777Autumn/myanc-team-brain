@@ -18,12 +18,14 @@ def sandbox_opener():
     try:
         parsed = urllib.parse.urlsplit(proxy)
         valid = (parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
-                 and parsed.port and not parsed.username and not parsed.password
+                 and parsed.port
                  and parsed.path in ("", "/") and not parsed.query and not parsed.fragment
                  and all(32 < ord(c) < 127 for c in proxy))
     except ValueError:
         valid = False
     require(valid, "sandbox_proxy_required")
+    # Native proxies may authenticate locally. ProxyHandler carries their
+    # userinfo as Proxy-Authorization; never expose or log the proxy URL.
     # The native shell excludes localhost by default. Remove bypass only in
     # this short-lived client; the parent sandbox and its policy stay intact.
     os.environ.pop("NO_PROXY", None)

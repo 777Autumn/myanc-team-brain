@@ -60,7 +60,7 @@ class NativeProxyTests(unittest.TestCase):
 
         class Proxy(BaseHTTPRequestHandler):
             def do_POST(self):
-                requests.append((self.path, self.headers['Authorization'],
+                requests.append((self.path, self.headers['Authorization'], self.headers['Proxy-Authorization'],
                                  json.loads(self.rfile.read(int(self.headers['Content-Length'])))))
                 self.send_response(200)
                 self.end_headers()
@@ -75,7 +75,7 @@ class NativeProxyTests(unittest.TestCase):
             worker.start()
             output = io.StringIO()
             environment = {'MYANC_CRM_ACTION_TOKEN': 'fictional-native-session',
-                           'http_proxy': 'http://127.0.0.1:' + str(server.server_port),
+                           'http_proxy': 'http://fixture:proxy@127.0.0.1:' + str(server.server_port),
                            'NO_PROXY': '127.0.0.1,localhost', 'no_proxy': '*'}
             try:
                 with patch.dict(tool.os.environ, environment, clear=True), \
@@ -87,12 +87,12 @@ class NativeProxyTests(unittest.TestCase):
                 worker.join(3)
             self.assertFalse(worker.is_alive())
             self.assertEqual(json.loads(output.getvalue())['status'], 'ok')
-            self.assertEqual(requests, [('http://127.0.0.1:18743/tool', 'Bearer fictional-native-session',
+            self.assertEqual(requests, [('http://127.0.0.1:18743/tool', 'Bearer fictional-native-session', 'Basic Zml4dHVyZTpwcm94eQ==',
                                         {'command': 'knowledge_search', 'input': {'query': 'fictional', 'subject': 'team'}})])
 
-    def test_proxy_validation_rejects_missing_remote_and_credentialed_endpoints(self):
+    def test_proxy_validation_rejects_missing_remote_and_malformed_endpoints(self):
         for proxy in ('', 'http://example.test:3128', 'https://127.0.0.1:3128',
-                      'http://user:password@127.0.0.1:3128', 'http://127.0.0.1:3128/path',
+                      'http://user:password@example.test:3128', 'http://127.0.0.1:3128/path',
                       'http://127.0.0.1:3128?query=1', 'http://127.0.0.1:99999',
                       'http://127.0.0.1:3128\n'):
             with self.subTest(proxy=proxy):
