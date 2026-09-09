@@ -1,0 +1,16 @@
+{
+  "app_id": "REPLACE_AFTER_APPROVAL",
+  "app_secret": "REPLACE_AFTER_APPROVAL",
+  "space_id": "REPLACE_AFTER_APPROVAL",
+  "root_node": "REPLACE_AFTER_APPROVAL",
+  "wiki_origin": "https://example.feishu.cn",
+  "state_directory": "/var/lib/team-brain/state",
+  "principals": [
+    {"platform":"feishu","user_id":"synthetic-member-1","chat_id":"synthetic-private-1","session_key":"synthetic:private:1","project":"synthetic-private-1"},
+    {"platform":"feishu","user_id":"synthetic-member-1","chat_id":"synthetic-group-1","session_key":"synthetic:group:1","project":"synthetic-group-1"},
+    {"platform":"feishu","user_id":"synthetic-member-2","chat_id":"synthetic-private-2","session_key":"synthetic:private:2","project":"synthetic-private-2"},
+    {"platform":"feishu","user_id":"synthetic-member-2","chat_id":"synthetic-group-2","session_key":"synthetic:group:2","project":"synthetic-group-2"},
+    {"platform":"feishu","user_id":"synthetic-member-3","chat_id":"synthetic-private-3","session_key":"synthetic:private:3","project":"synthetic-private-3"},
+    {"platform":"feishu","user_id":"synthetic-member-3","chat_id":"synthetic-group-3","session_key":"synthetic:group:3","project":"synthetic-group-3"}
+  ]
+}
