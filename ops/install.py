@@ -85,7 +85,11 @@ def log_fields(record):
     if not isinstance(message, str):
         return {}
     try:
-        return dict(part.split('=', 1) for part in shlex.split(message) if '=' in part)
+        fields = dict(part.split('=', 1) for part in shlex.split(message) if '=' in part)
+        # This event is emitted before the gateway installs its logfmt handler.
+        if re.fullmatch(r'\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} INFO config loaded path=\S+', message):
+            fields['msg'] = 'config loaded'
+        return fields
     except ValueError:
         raise RuntimeError('unparseable_receiver_log') from None
 

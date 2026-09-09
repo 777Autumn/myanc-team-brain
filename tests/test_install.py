@@ -65,6 +65,14 @@ class Quiescence(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'incomplete_receiver_journal'):
             install.activity(records[1:], 200)
 
+    def test_default_go_logger_startup_boundary_before_logfmt(self):
+        record = dict(boundary(), MESSAGE='2026/01/01 00:00:00 INFO config loaded path=/etc/cc-connect/config.toml')
+        with patch.object(install, 'CONFIG', '/etc/cc-connect/config.toml'):
+            self.assertEqual(install.activity([record], 200)['received'], 0)
+            record['MESSAGE'] = 'untrusted text: ' + record['MESSAGE']
+            with self.assertRaisesRegex(RuntimeError, 'incomplete_receiver_journal'):
+                install.activity([record], 200)
+
 
 class ReleaseGates(unittest.TestCase):
     def release(self):
