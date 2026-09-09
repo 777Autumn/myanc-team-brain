@@ -32,8 +32,13 @@ class FakeFeishu:
         result["text"] = "\n".join(block_text(b) for b in result["blocks"])
         return result
 
-    def search(self, query):
-        return list(self.pages)
+    def scoped_node(self, node):
+        if node in self.outside:
+            raise BrainError("outside_team_scope")
+        return self.pages[node]
+
+    def search(self, query, page_token=""):
+        return {"nodes": list(self.pages), "next_page_token": ""}
 
     def create_node(self, title):
         self.writes += 1
