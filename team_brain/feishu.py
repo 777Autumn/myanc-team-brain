@@ -114,8 +114,10 @@ class Feishu:
             # Only Wiki URLs supplied by the API, never arbitrary URLs/redirects.
             parsed = urllib.parse.urlsplit(meta.get("url", ""))
             if (item.get("entity_type") == "WIKI" and parsed.scheme == "https" and
-                    parsed.netloc == urllib.parse.urlsplit(self.wiki_origin).netloc and
-                    not parsed.query and not parsed.fragment):
+                    parsed.netloc == urllib.parse.urlsplit(self.wiki_origin).netloc):
+                # Native body hits include a space query and block fragment.
+                # Only extract the node; callers scope-check it and rebuild a
+                # canonical URL, never navigate to API-supplied parameters.
                 parts = parsed.path.strip("/").split("/")
                 if len(parts) == 2 and parts[0] == "wiki":
                     node = token(parts[1])

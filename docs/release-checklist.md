@@ -17,7 +17,8 @@
 | 原生调用 | 用途 | 需审核的权限与资源条件 |
 | --- | --- | --- |
 | `POST /search/v2/doc_wiki/search` | 团队文档检索 | `search:docs:read`；应用可见的团队空间 |
-| `GET /wiki/v2/spaces/get_node`、`GET /wiki/v2/spaces/:space_id/nodes` | 解析节点与创建后核对 | `wiki:node:read`（或既有 `wiki:wiki:readonly`）；目标空间可读 |
+| `GET /wiki/v2/spaces/get_node` | 解析节点 | `wiki:node:read`；目标空间可读 |
+| `GET /wiki/v2/spaces/:space_id/nodes` | 列出子节点、辅助未知创建的人工核对 | `wiki:node:retrieve`（或既有 `wiki:wiki:readonly`）；这是额外 scope，必须单独列入授权差额，不隐式申请 |
 | `GET /docx/v1/documents/:id`、`/raw_content`、`/blocks` | 正文及版本读取 | `docx:document:readonly`；目标文档可读 |
 | `POST /wiki/v2/spaces/:space_id/nodes` | 创建正式页面 | `wiki:node:create`；固定父节点可编辑 |
 | `POST /docx/v1/documents/:id/blocks/:parent/children`、`PATCH /blocks/:block` | 追加或局部修改正文 | `docx:document:write_only`；目标文档可编辑 |
