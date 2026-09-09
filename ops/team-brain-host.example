@@ -1,0 +1,3 @@
+#!/bin/sh
+# Install as a host-owned executable only after release approval.
+exec /opt/team-brain/current/venv/bin/python -m team_brain.host --config /var/lib/team-brain/config.json
