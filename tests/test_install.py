@@ -75,6 +75,18 @@ class Quiescence(unittest.TestCase):
 
 
 class ReleaseGates(unittest.TestCase):
+    def test_startup_journal_uses_utc_seconds_and_includes_all_receiver_pids(self):
+        release = self.release()
+        records = [dict(boundary(pid), _COMM='cc-connect-anc') for pid in ('111', '222')]
+        records.append(dict(boundary('333'), _COMM='sudo'))
+        with patch.object(install, 'run', return_value='\n'.join(json.dumps(r) for r in records)) as command:
+            result = release.startup_journal({'start_requested_at': '2026-09-10T00:05:50.637597+08:00'})
+        self.assertEqual([r['_PID'] for r in result], ['111', '222'])
+        args = command.call_args.args[0]
+        self.assertEqual(args[args.index('--since') + 1], '2026-09-09 16:05:50 UTC')
+        with self.assertRaisesRegex(RuntimeError, 'startup_time_requires_timezone'):
+            release.startup_journal({'start_requested_at': '2026-09-10T00:05:50'})
+
     def release(self):
         release = install.Release.__new__(install.Release)
         release.owners = {0, 900}
