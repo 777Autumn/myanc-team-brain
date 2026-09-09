@@ -30,6 +30,12 @@ team versions. Never scan or synchronize the personal workspace or chat history.
 - Drafts are not in the published search corpus. Unknown or conflicting evidence
   remains explicit. Distinct customer subjects must not be silently merged.
 
+The tenant-token runtime discovers knowledge by reading registered in-scope Wiki
+pages and matching keywords in their current title/text, five pages per tool call
+with a continuation cursor. This replaces the unverified unified search endpoint;
+the documented Wiki search requires a user token. No personal OAuth, vector store
+or additional search service is introduced. Discovery is not a stable source read.
+
 ## Host boundaries
 
 The trusted gateway fixes platform, user, chat, session and project. The host

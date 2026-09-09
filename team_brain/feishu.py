@@ -99,20 +99,14 @@ class Feishu:
             require(cursor, "incomplete_pagination")
         raise BrainError("incomplete_pagination")
 
-    def search(self, query):
-        result = self.request("POST", "/search/v2/doc_wiki/search", {
-            "query": query, "wiki_filter": {"space_ids": [self.space_id], "only_title": False},
-            "page_size": 20})
-        found = []
-        for item in result.get("res_units", []):
-            meta = item.get("result_meta", {})
-            # Only Wiki URLs supplied by the API, never arbitrary URLs/redirects.
-            parsed = urllib.parse.urlsplit(meta.get("url", ""))
-            if item.get("entity_type") == "WIKI" and parsed.netloc == urllib.parse.urlsplit(self.wiki_origin).netloc:
-                parts = parsed.path.strip("/").split("/")
-                if len(parts) == 2 and parts[0] == "wiki":
-                    found.append(token(parts[1]))
-        return found
+    def search_text(self, node_token):
+        node = self.scoped_node(node_token)
+        document = token(node["obj_token"])
+        raw = self.request("GET", f"/docx/v1/documents/{document}/raw_content")
+        # Search is discovery only. A full stable read is still required before
+        # citing an excerpt in a proposal; no read receipt is created here.
+        return {"node_token": node_token, "title": node.get("title", ""),
+                "url": self.url(node_token), "text": raw.get("content", "")}
 
     def snapshot(self, node_token):
         node = self.scoped_node(node_token)

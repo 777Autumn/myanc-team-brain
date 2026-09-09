@@ -81,6 +81,45 @@ class Lifecycle(unittest.TestCase):
         found = self.brain.tool("knowledge_search", {"query": "客户", "subject": "synthetic-customer-a"}, self.actor, "s")
         self.assertEqual([x["node_token"] for x in found["sources"]], [node])
 
+    def test_search_matches_live_text_and_only_reads_registered_customer_pages(self):
+        node = self.publish()
+        foreign = self.publish(material(subject="synthetic-customer-b"))
+        private = self.api.create_node("个人 Excel 原文")["node_token"]
+        self.api.append(private, [paragraph("Excel")], "private")
+        calls = []
+        original = self.api.search_text
+        def record(target):
+            calls.append(target)
+            return original(target)
+        self.api.search_text = record
+        args = {"query": "excel", "subject": "synthetic-customer-a"}
+        result = self.brain.tool("knowledge_search", args, self.actor, "search-session")
+        self.assertEqual([s["node_token"] for s in result["sources"]], [node])
+        self.assertEqual(calls, [node])
+        self.assertNotIn(foreign, calls)
+        self.assertNotIn(private, calls)
+        self.assertEqual(self.brain.tool("knowledge_search", {**args, "query": "不存在的词"}, self.actor, "s")["sources"], [])
+        # Discovery is not a stable, actor-bound source read.
+        value = material()
+        value["statements"][0]["source"] = {"node_token": node}
+        with self.assertRaisesRegex(BrainError, "source_must_be_read_again"):
+            self.brain.tool("knowledge_propose", value, self.actor, "search-session")
+        self.api.pages[node]["blocks"] = [paragraph("刚刚更新的资料")]
+        self.assertEqual(self.brain.tool("knowledge_search", args, self.actor, "s")["sources"], [])
+
+    def test_search_pages_through_team_corpus_and_reports_busy_pages(self):
+        nodes = [self.publish(material(subject="team")) for _ in range(8)]
+        self.journal.lock(nodes[0], "synthetic-inflight")
+        args = {"query": "Excel", "subject": "synthetic-customer-a"}
+        first = self.brain.tool("knowledge_search", args, self.actor, "s")
+        self.assertEqual(len(first["sources"]), 4)
+        self.assertEqual(first["skipped_pages"], 1)
+        self.assertIsNotNone(first["next_after"])
+        second = self.brain.tool("knowledge_search", {**args, "after": first["next_after"]}, self.actor, "s")
+        self.assertEqual(len(second["sources"]), 3)
+        self.assertIsNone(second["next_after"])
+        self.assertEqual({s["node_token"] for s in first["sources"] + second["sources"]}, set(nodes[1:]))
+
     def test_unsupported_fact_reinterpretations_and_missing_quotes_are_rejected(self):
         for false_fact in ("公司有 20 名员工。", "系统开放 API。"):
             value = material()

@@ -32,8 +32,8 @@ class FakeFeishu:
         result["text"] = "\n".join(block_text(b) for b in result["blocks"])
         return result
 
-    def search(self, query):
-        return list(self.pages)
+    def search_text(self, node):
+        return self.snapshot(node)
 
     def create_node(self, title):
         self.writes += 1
