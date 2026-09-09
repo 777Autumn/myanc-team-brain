@@ -20,6 +20,12 @@ def main():
         value = strict_json(raw)
         require(isinstance(value, dict))
         session = os.environ.get("TEAM_BRAIN_SESSION_TOKEN", "")
+        # The paired gateway gives both domains the same opaque action session.
+        # Existing isolated spawns preserve only its historical CRM-named alias.
+        # This is a session binding, not a CRM host credential or approval.
+        shared_session = os.environ.get("MYANC_CRM_ACTION_TOKEN", "")
+        require(not (session and shared_session and session != shared_session), "conflicting_host_session")
+        session = session or shared_session
         require(session, "no_host_session")
         # Fixed loopback endpoint, no proxy or redirects carrying the session token.
         request = urllib.request.Request("http://127.0.0.1:18743/tool", method="POST",
