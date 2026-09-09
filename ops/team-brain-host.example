@@ -1,3 +1,4 @@
 #!/bin/sh
 # Install as a host-owned executable only after release approval.
-exec /opt/team-brain/current/venv/bin/python -I -m team_brain.host --config /var/lib/team-brain/config.json
+# Replace REVIEWED_COMMIT with the exact approved source commit before packaging.
+exec /usr/bin/python3 -I -B -c 'import sys; sys.path.insert(0, "/opt/team-brain/releases/REVIEWED_COMMIT"); from team_brain.host import main; main()' --config /var/lib/team-brain/config.json

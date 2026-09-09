@@ -35,14 +35,15 @@ Wiki 节点读取/创建 scope 与 Docx token 的 `obj_type=docx` 参数已用�
 
 | 文件或目录 | 预期作用与模式 |
 | --- | --- |
-| `/opt/team-brain/releases/<commit>/` | 固定版本代码和独立 Python 3.11+ venv；代码由宿主管理，Agent 不可写 |
-| `/opt/team-brain/current` | 发布版本选择；包装器路径的祖先必须可信，配置和状态不可通过不可信链接访问 |
+| `/opt/team-brain/releases/<commit>/` | 固定版本源码，使用系统 Python 3.11+ 标准库；无需 pip 或 venv，Agent 不可写 |
 | `/var/lib/team-brain/config.json` | 由网关宿主账户持有、0600；固定应用、空间、根、六元组；不用 CRM 配置或账本 |
 | `/var/lib/team-brain/state/` | 宿主账户持有、0700；独立 SQLite、WAL、发布锁；不挂载进 Agent |
 | 宿主专用 `team-brain-host` 包装器 | 绝对路径启动固定解释器与配置；不可由 Agent 修改 |
 | 六环境中的 `team-brain-tool` 与 skill | 仅模型侧工具及说明，无私钥、真实 host 配置或批准入口 |
 
 `ops/host.example.json` 和包装器均为占位示例，不可直接用于生产。宿主配置文件及祖先目录不可被其他用户写入；模型进程必须使用与宿主不同的、无提权能力的账户。验证每个 Agent 不能读状态/配置、不能运行宿主包装器取得权限、不能访问租户凭据。POSIX 模式检查不能替代 ACL、容器挂载及 sudo 策略核验。
+
+具体安装器和分步操作见 [operator-install.md](operator-install.md)。每次发布在受保护的本地材料中固定实际文件、身份、八篇已审阅页面哈希、在线基线和包哈希；这些材料不提交 GitHub。首次登记先读取全部八篇并核对，再在同一事务写入独立账本，任意一篇变化或本地登记失败均不留下部分登记。
 
 网关新增两个宿主环境变量：`CC_TEAM_BRAIN_COMMAND`（受保护的绝对包装器路径），`CC_TEAM_BRAIN_PROJECTS`（恰好六个现有项目名）。启动初期读取并移除，不传给 Agent。共享现有回环工具监听器；无第二公网服务。现有 CRM host 按原逻辑保留，知识 host 通过独立命令和卡片 kind 路由。
 
