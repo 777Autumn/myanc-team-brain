@@ -6,7 +6,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .contracts import BrainError, block_text, require, token
+from .contracts import BrainError, block_text, require, text, token
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -99,20 +99,33 @@ class Feishu:
             require(cursor, "incomplete_pagination")
         raise BrainError("incomplete_pagination")
 
-    def search(self, query):
-        result = self.request("POST", "/search/v2/doc_wiki/search", {
+    def search(self, query, page_token=""):
+        text(query, 30)
+        require(query.strip(), "invalid_input")
+        body = {
             "query": query, "wiki_filter": {"space_ids": [self.space_id], "only_title": False},
-            "page_size": 20})
+            "page_size": 5}
+        if page_token:
+            body["page_token"] = text(page_token, 4096)
+        result = self.request("POST", "/search/v2/doc_wiki/search", body)
         found = []
         for item in result.get("res_units", []):
             meta = item.get("result_meta", {})
             # Only Wiki URLs supplied by the API, never arbitrary URLs/redirects.
             parsed = urllib.parse.urlsplit(meta.get("url", ""))
-            if item.get("entity_type") == "WIKI" and parsed.netloc == urllib.parse.urlsplit(self.wiki_origin).netloc:
+            if (item.get("entity_type") == "WIKI" and parsed.scheme == "https" and
+                    parsed.netloc == urllib.parse.urlsplit(self.wiki_origin).netloc and
+                    not parsed.query and not parsed.fragment):
                 parts = parsed.path.strip("/").split("/")
                 if len(parts) == 2 and parts[0] == "wiki":
-                    found.append(token(parts[1]))
-        return found
+                    node = token(parts[1])
+                    if node not in found:
+                        found.append(node)
+        cursor = result.get("page_token", "") if result.get("has_more") else ""
+        if result.get("has_more"):
+            text(cursor, 4096)
+            require(cursor != page_token, "incomplete_pagination")
+        return {"nodes": found, "next_page_token": cursor}
 
     def snapshot(self, node_token):
         node = self.scoped_node(node_token)

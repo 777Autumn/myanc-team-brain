@@ -96,6 +96,56 @@ class Lifecycle(unittest.TestCase):
         value["statements"][0]["evidence"] = "hypothesis"
         self.assertIn("团队假设", self.journal.get(self.proposal(value))["content"])
 
+    def test_native_search_filters_before_read_and_requires_explicit_source_read(self):
+        node = self.publish()
+        other = self.publish(material(subject="synthetic-customer-b"))
+        private = self.api.create_node("private-canary")["node_token"]
+        outside = self.publish()
+        self.api.outside.add(outside)
+        checked, calls = [], []
+        scope = self.api.scoped_node
+        def scoped(key):
+            checked.append(key)
+            return scope(key)
+        def search(query, cursor):
+            calls.append((query, cursor))
+            return {"nodes": [private, other, outside] if not cursor else [node],
+                    "next_page_token": "next+/=" if not cursor else ""}
+        self.api.scoped_node = scoped
+        self.api.search = search
+        original_snapshot = self.api.snapshot
+        self.api.snapshot = lambda _: self.fail("Search must not download document bodies")
+        args = {"query": "客户", "subject": "synthetic-customer-a"}
+        first = self.brain.tool("knowledge_search", args, self.actor, "search-session")
+        self.assertEqual(first["sources"], [])
+        self.assertEqual(checked, [outside])
+        second = self.brain.tool("knowledge_search", {**args, "page_token": first["next_page_token"]},
+                                 self.actor, "search-session")
+        self.assertEqual([s["node_token"] for s in second["sources"]], [node])
+        self.assertEqual(second["next_page_token"], "")
+        self.assertEqual(calls, [("客户", ""), ("客户", "next+/=")])
+        self.api.snapshot = original_snapshot
+        value = material()
+        value["statements"][0]["source"] = {"node_token": node}
+        with self.assertRaisesRegex(BrainError, "source_must_be_read_again"):
+            self.brain.tool("knowledge_propose", value, self.actor, "search-session")
+        self.read(node, session="search-session")
+        self.brain.tool("knowledge_propose", value, self.actor, "search-session")
+
+    def test_native_search_rejects_model_scope_and_busy_page(self):
+        node = self.publish()
+        args = {"query": "客户", "subject": "synthetic-customer-a"}
+        for extra in ({"space_id": "personal"}, {"wiki_filter": {}}, {"query": "甲" * 31}):
+            with self.assertRaises(BrainError):
+                self.brain.tool("knowledge_search", {**args, **extra}, self.actor, "s")
+        scope = self.api.scoped_node
+        def lock_during_lookup(key):
+            result = scope(key)
+            self.journal.lock(key, "synthetic-publication")
+            return result
+        self.api.scoped_node = lock_during_lookup
+        self.assertEqual(self.brain.tool("knowledge_search", args, self.actor, "s")["sources"], [])
+
     def test_source_receipts_are_bound_to_actor_and_live_session(self):
         node = self.publish()
         self.read(node)

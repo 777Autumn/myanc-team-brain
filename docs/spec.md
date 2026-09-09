@@ -32,6 +32,15 @@ team versions. Never scan or synchronize the personal workspace or chat history.
 
 ## Host boundaries
 
+Use Feishu's native document search with a host-fixed Wiki space filter, preserving
+its ranking and opaque pagination. Search accepts a nonblank query of at most 30
+characters and checks one five-hit page per call. Filter hits against the published
+registry, customer subject, root ancestry and publication locks before returning
+current node titles and canonical links. Search does not download bodies or grant
+a source-read receipt; knowledge_read remains required before citation/proposal.
+Do not introduce a local search index or literal-matching fallback. Native API
+identity support, body matching and index freshness require live acceptance.
+
 The trusted gateway fixes platform, user, chat, session and project. The host
 validates that tuple against configured environments and fixes the Wiki space,
 root and API origin. Model arguments cannot select identities, credentials,

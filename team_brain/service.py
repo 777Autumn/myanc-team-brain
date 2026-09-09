@@ -56,19 +56,30 @@ class Brain:
     def tool(self, command, value, principal, session_token):
         owner = self.owner(principal, session_token)
         if command == "knowledge_search":
-            fields(value, ("query", "subject"))
-            text(value["query"], 200)
+            fields(value, ("query", "subject"), ("page_token",))
+            text(value["query"], 30)
+            require(value["query"].strip(), "invalid_input")
             text(value["subject"], 100)
+            cursor = text(value["page_token"], 4096) if "page_token" in value else ""
+            matches = self.api.search(value["query"], cursor)
             results = []
-            for node in self.api.search(value["query"]):
+            for node in matches["nodes"]:
                 try:
-                    snapshot = self.readable(node, value["subject"])
-                    results.append({key: snapshot[key] for key in ("node_token", "title", "url")})
+                    page = self.journal.page(token(node))
+                    require(page["subject"] in (value["subject"], "team"), "subject_mismatch")
+                    require(not self.journal.locked(node), "page_busy")
+                    metadata = self.api.scoped_node(node)
+                    require(not self.journal.locked(node), "page_busy")
+                    results.append({"node_token": node, "title": metadata.get("title", ""),
+                                    "url": self.api.url(node)})
                 except BrainError as exc:
                     if exc.code not in ("page_not_published", "subject_mismatch", "page_busy", "outside_team_scope"):
                         raise
             return {"status": "ok", "sources": results,
-                    "coverage": "Up to 20 search hits, filtered to published team pages. Empty results do not prove absence."}
+                    "next_page_token": matches["next_page_token"],
+                    "coverage": "One native search page, filtered to published subject/team pages. "
+                                "Continue with the same query/subject and next_page_token when present. "
+                                "Read sources before citing; empty results do not prove absence."}
         if command == "knowledge_read":
             fields(value, ("subject",), ("node_token", "reference"))
             require(("node_token" in value) != ("reference" in value))
