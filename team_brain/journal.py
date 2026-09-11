@@ -68,6 +68,12 @@ class Journal:
         require(row is not None, "page_not_published")
         return dict(row)
 
+    def catalog_nodes(self, subject, after):
+        # One extra key signals continuation without an extra remote lookup.
+        return [row[0] for row in self.db.execute(
+            "SELECT node FROM pages WHERE subject IN (?, 'team') AND node > ? ORDER BY node LIMIT 6",
+            (subject, after))]
+
     def locked(self, resource):
         return self.db.execute("SELECT proposal FROM locks WHERE resource=?", (resource,)).fetchone()
 

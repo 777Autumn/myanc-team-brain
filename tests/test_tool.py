@@ -11,15 +11,21 @@ from team_brain import tool
 
 
 class ToolSessionTests(unittest.TestCase):
-    def invoke(self, environment):
+    def invoke(self, environment, command='knowledge_search', raw='{"query":"fictional","subject":"team"}'):
         output = io.StringIO()
         with patch.dict(tool.os.environ, {'HTTP_PROXY': 'http://127.0.0.1:18080', **environment}, clear=True), \
-                patch.object(tool.sys, 'argv', ['team-brain-tool', 'knowledge_search']), \
-                patch.object(tool.sys, 'stdin', io.StringIO('{"query":"fictional","subject":"team"}')), \
+                patch.object(tool.sys, 'argv', ['team-brain-tool', command]), \
+                patch.object(tool.sys, 'stdin', io.StringIO(raw)), \
                 patch.object(tool.urllib.request, 'build_opener') as build, redirect_stdout(output):
             build.return_value.open.return_value.__enter__.return_value.read.return_value = b'{"status":"ok","sources":[]}'
             tool.main()
         return json.loads(output.getvalue()), build
+
+    def test_catalog_uses_existing_scoped_host_connection(self):
+        result, build = self.invoke({'MYANC_CRM_ACTION_TOKEN': 'fixture'}, 'knowledge_catalog', '{"subject":"team"}')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(json.loads(build.return_value.open.call_args.args[0].data),
+                         {'command': 'knowledge_catalog', 'input': {'subject': 'team'}})
 
     def test_isolated_session_uses_existing_gateway_action_token(self):
         # The deployed paired gateway injects one token under both names, but
