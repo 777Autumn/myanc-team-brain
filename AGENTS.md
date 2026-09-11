@@ -1,5 +1,9 @@
 # Development contract
 
+- GitHub delivery and VPS candidates follow the shared authority in
+  `77AutumN/myanc-crm:ops/RELEASE.md`. A knowledge-runtime candidate requires
+  the optional third SHA there; first-install/bootstrap scripts are not upgrades.
+
 - Keep the implementation in this repository. Existing CRM and gateway working
   trees contain unrelated work; gateway integration belongs in a separate checkout.
 - `docs/spec.md` is the implementation scope. Changing production services,

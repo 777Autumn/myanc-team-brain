@@ -21,7 +21,7 @@ team versions. Never scan or synchronize the personal workspace or chat history.
 - Eight seed drafts: team/service boundaries; banquet vocabulary/process; discovery
   interview; meeting brief; meeting facts/questions; evidence/system inventory;
   narrow workflow selection; solution/acceptance draft.
-- Model surface: search, read, propose. Search/read return source IDs, URLs and
+- Model surface: catalog, search, read, propose. Search/read return source IDs, URLs and
   current evidence state; proposals carry explicit source excerpts and references.
 - A proposed update includes the prior content and readable diff. Only its proposer
   in the bound conversation can confirm the exact persisted preview/card.
@@ -40,6 +40,17 @@ current node titles and canonical links. Search does not download bodies or gran
 a source-read receipt; knowledge_read remains required before citation/proposal.
 Do not introduce a local search index or literal-matching fallback. Native API
 identity support, body matching and index freshness require live acceptance.
+
+For general methods, use knowledge_catalog over the existing published registry
+before reading relevant pages. It accepts only subject and optional page_token;
+each call checks at most five same-subject/team candidates using stable node-key
+pagination, the current root/space and locks before and after remote lookup.
+Paused publishing does not block reads. Cursors bind identity/session/subject and
+are not snapshots; even a filtered empty page can have continuation. Directory
+metadata grants no source-read receipt. Permission, API and database failures must
+remain failures, not empty results. No body cache, new table, title allowlist,
+vector index or general space enumeration is introduced. The skill's tool reference
+is the authority for choosing catalog vs native search and handling follow-ups.
 
 The trusted gateway fixes platform, user, chat, session and project. The host
 validates that tuple against configured environments and fixes the Wiki space,

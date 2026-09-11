@@ -146,6 +146,108 @@ class Lifecycle(unittest.TestCase):
         self.api.scoped_node = lock_during_lookup
         self.assertEqual(self.brain.tool("knowledge_search", args, self.actor, "s")["sources"], [])
 
+    def test_catalog_finds_published_methods_when_native_search_misses(self):
+        value = material(subject="team")
+        value["title"] = "客户初访提纲"
+        node = self.publish(value)
+        self.publish(material(subject="unrelated-customer"))
+        self.api.create_node("未发布原文")
+        self.api.search = lambda *_: {"nodes": [], "next_page_token": ""}
+        self.assertEqual(self.brain.tool("knowledge_search", {"query": "宴会中心", "subject": "team"},
+                                        self.actor, "catalog-session")["sources"], [])
+        snapshot = self.api.snapshot
+        self.api.snapshot = lambda _: self.fail("Catalog must not read document bodies")
+        result = self.brain.tool("knowledge_catalog", {"subject": "team"}, self.actor, "catalog-session")
+        self.assertEqual(result["sources"], [{"node_token": node, "title": "客户初访提纲", "url": self.api.url(node)}])
+        self.assertEqual(result["next_page_token"], "")
+        for actor in PRINCIPALS:
+            self.assertEqual(self.brain.tool("knowledge_catalog", {"subject": "team"}, actor, "s")["sources"], result["sources"])
+        self.api.snapshot = snapshot
+        value["statements"][0]["source"] = {"node_token": node}
+        with self.assertRaisesRegex(BrainError, "source_must_be_read_again"):
+            self.brain.tool("knowledge_propose", value, self.actor, "catalog-session")
+        self.read(node, subject="team", session="catalog-session")
+        self.brain.tool("knowledge_propose", value, self.actor, "catalog-session")
+
+    def test_catalog_empty_filtered_page_continues_with_at_most_five_lookups(self):
+        nodes = [self.publish(material(subject="team")) for _ in range(7)]
+        self.api.outside.update(nodes[:5])
+        checks = []
+        scoped = self.api.scoped_node
+        def observe(node):
+            checks.append(node)
+            return scoped(node)
+        self.api.scoped_node = observe
+        self.api.search = lambda *_: self.fail("Catalog must use the published registry, not search")
+        first = self.brain.tool("knowledge_catalog", {"subject": "team"}, self.actor, "s")
+        self.assertEqual(first["sources"], [])
+        self.assertEqual(checks, nodes[:5])
+        self.assertTrue(first["next_page_token"])
+        self.journal.pause(nodes[5], True)  # Pause blocks publishing, not reading.
+        self.api.pages[nodes[5]]["title"] = "当前标题"
+        second = self.brain.tool("knowledge_catalog", {"subject": "team", "page_token": first["next_page_token"]},
+                                 self.actor, "s")
+        self.assertEqual([s["node_token"] for s in second["sources"]], nodes[5:])
+        self.assertEqual(second["sources"][0]["title"], "当前标题")
+        self.assertEqual(second["next_page_token"], "")
+        self.assertEqual(checks, nodes)
+
+    def test_catalog_cursor_is_scoped_and_reauthorizes_every_page(self):
+        for _ in range(6):
+            self.publish(material(subject="team"))
+        cursor = self.brain.tool("knowledge_catalog", {"subject": "team"}, self.actor, "s")["next_page_token"]
+        args = {"subject": "team", "page_token": cursor}
+        for actor, session, value in ((PRINCIPALS[1], "s", args), (self.actor, "other", args),
+                                      (self.actor, "s", {**args, "subject": "customer-a"}),
+                                      (self.actor, "s", {**args, "page_token": "node99." + cursor.split(".")[1]})):
+            with self.subTest(actor=actor, session=session, value=value):
+                with self.assertRaisesRegex(BrainError, "invalid_page_token"):
+                    self.brain.tool("knowledge_catalog", value, actor, session)
+        for extra in ({"space_id": "other"}, {"principal": {}}, {"query": "title"},
+                      {"page_token": "bad"}, {"page_token": "node0.中文"}):
+            with self.assertRaises(BrainError):
+                self.brain.tool("knowledge_catalog", {"subject": "team", **extra}, self.actor, "s")
+        self.brain.allowed.remove(self.actor.key)
+        with self.assertRaisesRegex(BrainError, "principal_mismatch"):
+            self.brain.tool("knowledge_catalog", args, self.actor, "s")
+
+    def test_catalog_skips_publication_locks_but_propagates_failures(self):
+        node = self.publish(material(subject="team"))
+        scoped = self.api.scoped_node
+        self.journal.lock(node, "publishing")
+        self.api.scoped_node = lambda _: self.fail("Locked page must not reach API")
+        args = {"subject": "team"}
+        self.assertEqual(self.brain.tool("knowledge_catalog", args, self.actor, "s")["sources"], [])
+        self.journal.release("publishing")
+        def locked_during_lookup(key):
+            result = scoped(key)
+            self.journal.lock(key, "publishing")
+            return result
+        self.api.scoped_node = locked_during_lookup
+        self.assertEqual(self.brain.tool("knowledge_catalog", args, self.actor, "s")["sources"], [])
+        self.journal.release("publishing")
+        for code in ("api_rejected", "api_transport_error", "invalid_response"):
+            def failed(_):
+                raise BrainError(code)
+            self.api.scoped_node = failed
+            with self.assertRaisesRegex(BrainError, code):
+                self.brain.tool("knowledge_catalog", args, self.actor, "s")
+        self.journal.close()
+        import sqlite3
+        with self.assertRaises(sqlite3.ProgrammingError):
+            self.brain.tool("knowledge_catalog", args, self.actor, "s")
+
+    def test_catalog_keyset_survives_restart_and_earlier_registry_changes(self):
+        nodes = [self.publish(material(subject="team")) for _ in range(6)]
+        cursor = self.brain.tool("knowledge_catalog", {"subject": "team"}, self.actor, "s")["next_page_token"]
+        self.journal.db.execute("DELETE FROM pages WHERE node=?", (nodes[0],))
+        self.journal.close()
+        self.journal = Journal(self.path)
+        self.brain = Brain(self.journal, self.api, PRINCIPALS)
+        last = self.brain.tool("knowledge_catalog", {"subject": "team", "page_token": cursor}, self.actor, "s")
+        self.assertEqual([source["node_token"] for source in last["sources"]], nodes[5:])
+        self.assertEqual(last["next_page_token"], "")
+
     def test_source_receipts_are_bound_to_actor_and_live_session(self):
         node = self.publish()
         self.read(node)
