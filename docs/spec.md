@@ -52,6 +52,13 @@ remain failures, not empty results. No body cache, new table, title allowlist,
 vector index or general space enumeration is introduced. The skill's tool reference
 is the authority for choosing catalog vs native search and handling follow-ups.
 
+Answer completion and conditional source display follow
+[the team-brain Skill](../skills/team-brain/SKILL.md). The September 11 Owner decision
+removes a mandatory-link presentation gate for ordinary grounded answers; it does
+not remove source reads, scoped read receipts or evidence/privacy boundaries.
+Existing conversation/tool records support bounded operator audits; this change
+does not add a permanent answer-to-source database or a model-visible audit tool.
+
 The trusted gateway fixes platform, user, chat, session and project. The host
 validates that tuple against configured environments and fixes the Wiki space,
 root and API origin. Model arguments cannot select identities, credentials,
