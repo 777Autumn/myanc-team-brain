@@ -48,6 +48,79 @@ class Lifecycle(unittest.TestCase):
     def read(self, node, subject="synthetic-customer-a", actor=None, session="session-a"):
         return self.brain.tool("knowledge_read", {"node_token": node, "subject": subject}, actor or self.actor, session)
 
+    def test_cancelled_status_is_current_even_when_page_is_unchanged(self):
+        node = self.publish()
+        before = self.read(node)["source"]["text"]
+        value = material("还需核对虚构导出字段。")
+        value["target"] = node
+        identifier = self.proposal(value)
+        self.brain.bind(identifier, self.callback)
+        self.brain.claim(identifier, "cancel", self.callback)
+        frozen = self.journal.get(identifier)
+        writes = self.api.writes
+        result = self.brain.tool("knowledge_status", {"approval_id": identifier}, self.actor, "next-turn-token")
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["proposal"]["state"], "cancelled")
+        self.assertEqual(result["proposal"]["next_action"], "none")
+        self.assertEqual(result["proposal"]["summary"], "已取消，不会发布。")
+        self.assertEqual(self.journal.get(identifier), frozen)
+        self.assertEqual(self.api.writes, writes)
+        self.assertEqual(self.read(node)["source"]["text"], before)
+
+    def test_status_rejects_other_principals_and_extra_fields(self):
+        identifier = self.proposal()
+        for actor in PRINCIPALS[1:]:
+            with self.subTest(actor=actor.project), self.assertRaisesRegex(BrainError, "principal_mismatch"):
+                self.brain.tool("knowledge_status", {"approval_id": identifier}, actor, "session-a")
+        for key in ("session_key", "chat_id", "project"):
+            actor = replace(self.actor, **{key: "other-conversation"})
+            self.brain.allowed.add(actor.key)
+            with self.subTest(key=key), self.assertRaisesRegex(BrainError, "principal_mismatch"):
+                self.brain.tool("knowledge_status", {"approval_id": identifier}, actor, "session-a")
+        for extra in ("principal", "subject", "decision", "session_token", "target"):
+            with self.subTest(extra=extra), self.assertRaisesRegex(BrainError, "invalid_input"):
+                self.brain.tool("knowledge_status", {"approval_id": identifier, extra: "fake"}, self.actor, "s")
+
+    def test_status_expiry_and_uncertainty_do_not_mutate_or_suggest_approval(self):
+        identifier = self.proposal()
+        for state, expected in (("pending", "expired"), ("claimed", "claimed"), ("executing", "executing"),
+                                ("unknown", "unknown"), ("conflict", "conflict"), ("needs_revision", "needs_revision")):
+            with self.subTest(state=state):
+                p = self.journal.get(identifier)
+                p["state"] = state
+                self.journal.save(p)
+                self.now = p["expires"]
+                result = self.brain.tool("knowledge_status", {"approval_id": identifier}, self.actor, "s")["proposal"]
+                self.assertEqual(result["state"], expected)
+                self.assertNotEqual(result["next_action"], "review_card")
+                self.assertEqual(self.journal.get(identifier), p)
+        self.assertEqual(self.api.writes, 0)
+
+    def test_status_verified_returns_receipt_without_frozen_draft_or_card_binding(self):
+        identifier = self.proposal()
+        self.approve(identifier)
+        self.brain.execute(identifier, self.callback)
+        result = self.brain.tool("knowledge_status", {"approval_id": identifier}, self.actor, "s")
+        self.assertEqual(result["proposal"]["state"], "verified")
+        self.assertEqual(result["proposal"]["next_action"], "none")
+        self.assertEqual(result["proposal"]["receipt"]["url"], self.journal.get(identifier)["receipt"]["url"])
+        for private in ("content", "diff", "preview", "owner", "actor", "card"):
+            self.assertNotIn(private, result["proposal"])
+
+    def test_status_reads_legacy_proposal_without_migration_or_card_effect(self):
+        identifier = self.proposal()
+        unbound = self.brain.tool("knowledge_status", {"approval_id": identifier}, self.actor, "s")
+        self.assertEqual(unbound["proposal"]["next_action"], "reconcile")
+        self.brain.bind(identifier, self.callback)
+        p = self.journal.get(identifier)
+        del p["review"]
+        self.journal.save(p)
+        result = self.brain.tool("knowledge_status", {"approval_id": identifier}, self.actor, "s")
+        self.assertEqual(result["proposal"]["state"], "pending")
+        self.assertEqual(result["proposal"]["next_action"], "review_card")
+        self.assertEqual(self.journal.get(identifier), p)
+        self.assertEqual(self.api.writes, 0)
+
     def test_meeting_capture_approval_and_reuse_across_six_environments(self):
         self.assertEqual(self.brain.tool("knowledge_search", {"query": "会前准备", "subject": "synthetic-customer-a"},
                                         self.actor, "session-a")["sources"], [])
