@@ -115,36 +115,48 @@ class Brain:
                     raise
         return results
 
+    def source_label(self, source, quote, subject, owner):
+        require(isinstance(source, dict))
+        if "node_token" in source:
+            fields(source, ("node_token",))
+            snapshot = self.readable(source["node_token"], subject)
+            require(self.journal.seen(owner, source["node_token"], fingerprint(snapshot)), "source_must_be_read_again")
+            require(quote in snapshot["text"], "quote_not_in_source")
+            return snapshot["url"]
+        fields(source, ("submitted_text", "label"))
+        require(quote in text(source["submitted_text"], 4000), "quote_not_in_source")
+        label = "成员提供材料：" + text(source["label"], 120)
+        require(not any(mark in label for mark in (":\\", ":/", "file://")), "private_path")
+        return label
+
     def render(self, value, owner):
-        fields(value, ("title", "subject", "statements"), ("target", "block_id", "related"))
+        fields(value, ("title", "subject", "statements"), ("target", "block_id", "related", "notes"))
         text(value["title"], 120)
         text(value["subject"], 100)
         statements = value["statements"]
-        require(isinstance(statements, list) and 0 < len(statements) <= 12)
+        notes = value.get("notes", [])
+        require(isinstance(statements, list) and isinstance(notes, list))
+        require(1 <= len(statements) + len(notes) <= 12)
         lines = ["主题：" + value["subject"], "成员确认仅确认记录准确，不代表客户认可或结果已验证。"]
         for statement in statements:
             fields(statement, ("text", "evidence", "quote", "source"))
             claim, quote = text(statement["text"], 600), text(statement["quote"], 600)
             require(statement["evidence"] in EVIDENCE)
-            source = statement["source"]
-            require(isinstance(source, dict))
-            if "node_token" in source:
-                fields(source, ("node_token",))
-                snapshot = self.readable(source["node_token"], value["subject"])
-                require(self.journal.seen(owner, source["node_token"], fingerprint(snapshot)), "source_must_be_read_again")
-                require(quote in snapshot["text"], "quote_not_in_source")
-                label = snapshot["url"]
-            else:
-                fields(source, ("submitted_text", "label"))
-                material = text(source["submitted_text"], 4000)
-                require(quote in material, "quote_not_in_source")
-                label = "成员提供材料：" + text(source["label"], 120)
-                # Publish the excerpt itself, never an inaccessible local source path.
-                require(not any(mark in label for mark in (":\\", ":/", "file://")), "private_path")
+            label = self.source_label(statement["source"], quote, value["subject"], owner)
             # Conservative v1: factual text is verbatim. Only hypotheses can infer.
             require(statement["evidence"] == "hypothesis" or claim == quote, "fact_must_match_quote")
             lines += ["", "【" + EVIDENCE[statement["evidence"]] + "】" + claim,
-                      "来源：" + label, "引文：" + quote]
+                      "来源：" + label]
+            if claim != quote:
+                lines.append("引文：" + quote)
+        for note in notes:
+            fields(note, ("kind", "text", "quote", "source"))
+            kind = text(note["kind"], 20)
+            require(kind in ("suggestion", "question"))
+            claim, quote = text(note["text"], 600), text(note["quote"], 600)
+            label = self.source_label(note["source"], quote, value["subject"], owner)
+            heading = "整理建议" if kind == "suggestion" else "待核实问题"
+            lines += ["", "【" + heading + "】" + claim, "来源：" + label, "依据引文：" + quote]
         related = value.get("related", [])
         require(isinstance(related, list) and len(related) <= 5)
         for node in related:
@@ -186,6 +198,10 @@ class Brain:
         operation = "替换选中段落" if proposal["block_id"] else ("追加到已有页面" if target else "新建页面")
         prior = old if proposal["block_id"] else (base["text"] if base else "（新建页面，无既有正文）")
         destination = self.api.url(target) if target else self.api.url(self.api.root_node)
+        proposal["review"] = {"operation": "replace" if proposal["block_id"] else ("append" if target else "create"),
+                              "title": proposal["title"], "destination": destination,
+                              "before": old if proposal["block_id"] else (base["text"] if base else ""),
+                              "after": content}
         proposal["preview"] = ("操作：" + operation + "\n页面标题：" + proposal["title"] +
                                "\n目标页面／新建父节点：" + destination +
                                "\n审核时既有正文：\n" + prior + "\n\n变更差异：\n" + proposal["diff"])
@@ -196,10 +212,13 @@ class Brain:
 
     @staticmethod
     def result(proposal, replayed=False):
-        return {"kind": "knowledge", "status": proposal["state"], "approval_id": proposal["id"],
+        result = {"kind": "knowledge", "status": proposal["state"], "approval_id": proposal["id"],
                 "change_id": proposal["id"], "title": proposal["title"], "diff": proposal["diff"],
                 "preview": proposal["preview"], "target": proposal["target"],
                 "expires": proposal["expires"], "receipt": proposal["receipt"], "replayed": replayed}
+        if "review" in proposal:
+            result["review"] = proposal["review"]
+        return result
 
     def owned(self, proposal_id, principal, check_card=False):
         self.authorize(principal)

@@ -21,6 +21,14 @@ JSON
 
 `evidence`：`partner_report`、`hypothesis`、`customer_confirmed`、`verified_outcome`。最后两类必须有直接确认或验证材料，不可从伙伴转述升级。
 
+`statements` 必填，可为空数组。可选 `notes` 是数组，每项严格包含 `kind`（`suggestion`／`question`）、`text`、`quote`、`source`，展示为“整理建议”“待核实问题”。两数组合计 1–12 项；建议正文和引文分别最多 600 字，来源规则与事实相同，不能跨客户、引用未读或已变化页面、伪造引文或携带私有路径。仅补建议时无需重抄已有事实，例如：
+
+```json
+{"title":"虚构客户访谈","subject":"synthetic-customer-a","statements":[],"notes":[{"kind":"question","text":"是否有官方接口文档可核对？","quote":"系统现阶段只能导出 Excel。","source":{"submitted_text":"系统现阶段只能导出 Excel。","label":"虚构访谈逐字稿"}}]}
+```
+
+建议与问题不会升级为客户确认或验证结果；实际推断仍用 `hypothesis`。相同事实正文与引文只展示一次并保留来源，推断和建议保留依据。
+
 更新使用 `target` 指定正式节点，标题保持一致；默认追加。`block_id` 只替换一个纯文本段落；较长更新拆成独立提案。`related` 可给最多五个同客户或通用节点。Wiki 的父子目录自动形成索引，关联链接随已确认正文写入；首版无独立索引数据库或额外自动摘要。
 
 每个页面在账本登记唯一 subject；客户页面只可在对应 subject 下读写，`team` 通用页可供其他主题引用但不得借客户更新改写。客户标识由三人约定并核对，系统不自动合并疑似重复客户。
@@ -41,7 +49,7 @@ JSON
 
 读取可用 `reference` 替代 `node_token`，支持配置租户下的 `/wiki/...` 或 `/docx/...` 链接；Docx 必须能解析为已经登记的团队 Wiki 节点。模型无法借此读取未选定的个人或空间外文档。
 
-确认预览包含新建/追加/段落替换类型、标题、目的页或父节点链接、审核时旧正文及差异。预览超过 24 KB 时拒绝提交，改为选定段落的小提案；不截断后让成员盲目确认。
+确认卡片包含新建/追加/段落替换类型、标题、目的页或父节点链接及完整待写正文。追加展示既有正文与新增内容，替换展示前后段落。宿主返回可选 `review`（operation/title/destination/before/after），同时保留冻结的 `preview` 和 `diff`；旧提案不重新生成。网关按最终序列化卡片校验 24,000 字节上限，超长返回 `review_card_too_large_split_required`，要求拆分或选择段落；不截断后让成员盲目确认。正文中的 Markdown、提及和伪造按钮只作为普通文字显示。
 
 宿主 stdin 使用 `operation`（tool/bind/claim/execute）和可信 `principal`；这份入口仅存在于宿主隔离账户。模型工具只接受本文四种 knowledge 命令。`bind` 固定实际卡片 message_id；`claim` 验证五字段身份与该卡片，只有一次调用取得执行权。
 

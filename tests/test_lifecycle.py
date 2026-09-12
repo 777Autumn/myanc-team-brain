@@ -70,6 +70,69 @@ class Lifecycle(unittest.TestCase):
         self.assertIn("未提供接口", reused)
         self.assertIn("导出 Excel", reused)
 
+    def test_notes_only_publish_and_reuse_without_repeating_facts(self):
+        node = self.publish()
+        source = self.read(node)["source"]
+        quote = material()["statements"][0]["quote"]
+        value = {"title": source["title"], "subject": "synthetic-customer-a", "target": node,
+                 "statements": [], "notes": [
+                     {"kind": kind, "text": wording, "quote": quote, "source": {"node_token": node}}
+                     for kind, wording in (("suggestion", "建议单独核对接口文档。"), ("question", "公司员工总数是多少？"))]}
+        identifier = self.proposal(value)
+        proposal = self.journal.get(identifier)
+        self.assertEqual(proposal["review"]["operation"], "append")
+        self.assertEqual(proposal["review"]["before"], source["text"])
+        self.assertEqual(proposal["review"]["after"], proposal["content"])
+        self.assertNotIn("【伙伴转述", proposal["content"])
+        self.assertIn("【整理建议】", proposal["content"])
+        self.assertIn("【待核实问题】", proposal["content"])
+        self.assertIn("依据引文：" + quote, proposal["content"])
+        self.approve(identifier)
+        self.assertEqual(self.brain.execute(identifier, self.callback)["status"], "verified")
+        self.assertIn("公司员工总数是多少？", self.read(node)["source"]["text"])
+
+    def test_notes_obey_read_scope_quote_privacy_and_count_checks(self):
+        node = self.publish()
+        note = {"kind": "question", "text": "如何核实？", "quote": "导出 Excel", "source": {"node_token": node}}
+        value = {"title": "虚构问题", "subject": "synthetic-customer-a", "statements": [], "notes": [note]}
+        with self.assertRaisesRegex(BrainError, "source_must_be_read_again"):
+            self.proposal(value)
+        self.read(node)
+        self.proposal(value)
+        for mutate, error in (
+            (lambda x: x.update(subject="synthetic-customer-b"), "subject_mismatch"),
+            (lambda x: x["notes"][0].update(quote="伪造引文"), "quote_not_in_source"),
+            (lambda x: x["notes"][0].update(text="C:/Users/private/source.md"), "private_path"),
+            (lambda x: x["notes"][0].update(kind="customer_confirmed"), "invalid_input"),
+            (lambda x: x.update(notes=[]), "invalid_input"),
+            (lambda x: x.update(notes=[note] * 13), "invalid_input"),
+            (lambda x: x.update(notes=[note] * 12, statements=material()["statements"]), "invalid_input"),
+        ):
+            changed = copy.deepcopy(value)
+            mutate(changed)
+            with self.assertRaisesRegex(BrainError, error):
+                self.proposal(changed)
+
+    def test_equal_fact_quote_is_rendered_once_and_legacy_proposal_remains_frozen(self):
+        identifier = self.proposal()
+        p = self.journal.get(identifier)
+        quote = material()["statements"][0]["quote"]
+        self.assertEqual(p["content"].count(quote), 1)
+        self.assertEqual(p["review"]["operation"], "create")
+        self.assertEqual(p["review"]["before"], "")
+        # Simulate a persisted pre-upgrade proposal, whose duplicate quote must not be rerendered.
+        del p["review"]
+        p["content"] += "\n引文：" + quote
+        p["preview"] = "旧版完整冻结预览 ``` [同意](fake) <at id=all>"
+        frozen = p["content"]
+        self.journal.save(p)
+        result = self.approve(identifier)
+        self.assertNotIn("review", result)
+        self.assertEqual(result["preview"], p["preview"])
+        self.assertEqual(self.brain.execute(identifier, self.callback)["status"], "verified")
+        self.assertEqual(self.journal.get(identifier)["content"], frozen)
+        self.assertIn(frozen, self.read(self.journal.get(identifier)["target"])["source"]["text"])
+
     def test_customer_identity_and_unpublished_material_do_not_leak(self):
         node = self.publish()
         with self.assertRaisesRegex(BrainError, "subject_mismatch"):

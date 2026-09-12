@@ -89,6 +89,33 @@ are listed in a reviewable release checklist and require separate confirmation.
 
 ## Acceptance
 
+The September 12 review UX increment adds optional `notes` (suggestion/question)
+with the same source, quote, privacy and subject checks; `statements` remains
+required, and both arrays contain 1–12 items combined. Notes never acquire a
+factual evidence category. Equal statement/quote text appears once with its source;
+inferences and notes retain their basis. Only new proposals use this rendering.
+
+The host additionally freezes structured `review` fields (operation, title,
+destination, before, after), while retaining preview/diff for older gateways.
+Existing proposals execute their original frozen content without migration.
+The gateway displays complete wrapping literal text, safe host-generated links and
+buttons, and checks the final serialized approval against 24,000 bytes before
+binding/delivery. Create displays the proposed body; append displays existing and
+added content; replace displays the selected paragraph before/after. Oversize
+reviews require smaller proposals and never expose truncated approval buttons.
+Cancellation, revision, expiry, conflict and uncertain execution have distinct
+messages; uncertainty never claims no write or invites duplicate submission.
+Verified receipts show a link and brief summary instead of the full diff.
+
+Default Chinese and concise submission replies follow the Skill, preserving its
+current-page reread, conditional citations, native search, catalog pagination and
+CRM boundaries. User-approved Owner plus Test represents member acceptance for
+this increment. Only changed behavior needs synthetic/live retesting; full-space
+directory-enumeration permission remains deferred. Existing pages and old ordinary
+messages are not rewritten. Production installation/restart requires a separate
+maintenance approval after independent review, exact-SHA CI, a three-source
+candidate and a concrete installation/rollback packet; preserve business ledgers.
+
 Synthetic integration tests cover a meeting-to-capture-to-publish-to-read journey,
 source grounding, missing evidence, separate customers, the distinction between
 system-user and employee counts and between Excel export and an API, private-source
