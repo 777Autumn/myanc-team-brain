@@ -81,6 +81,21 @@ recording/transcription or whole-chat collection in v1.
 
 ## Delivery
 
+### Proposal status follow-up repair
+
+After cancellation, a model must not infer pending approval from an unchanged
+page. Add knowledge_status(approval_id), a read-only lookup using the existing
+journal and authenticated Principal (platform/user/chat/session-key/project).
+It returns an observed state, fixed-language summary and limited verified receipt;
+it never calls Feishu, regenerates a card, changes approval state or exposes draft
+content. Pending expiry is projected without a journal mutation; executing/unknown
+remain uncertain. Model session-token rotation does not change the bound Principal.
+Other principals and extra identity/action fields are rejected. Legacy proposals
+remain readable without migration. Status questions require a fresh status read;
+current-page questions separately keep the existing reread requirement. This
+provides the missing evidence channel, not proof of live model compliance: replay
+the Test cancellation question after a separately authorized release.
+
 Implement and test locally, open a private-repository PR with CI, and prepare a
 separate gateway integration PR. Existing production/local/GitHub gateway versions
 must be reconciled before activation; do not fold unrelated CRM changes into a PR.

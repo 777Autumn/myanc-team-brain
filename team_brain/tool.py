@@ -35,7 +35,7 @@ def sandbox_opener():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("knowledge_catalog", "knowledge_search", "knowledge_read", "knowledge_propose"))
+    parser.add_argument("command", choices=("knowledge_catalog", "knowledge_search", "knowledge_read", "knowledge_propose", "knowledge_status"))
     args = parser.parse_args()
     try:
         raw = sys.stdin.read(60001)

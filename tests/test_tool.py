@@ -27,6 +27,12 @@ class ToolSessionTests(unittest.TestCase):
         self.assertEqual(json.loads(build.return_value.open.call_args.args[0].data),
                          {'command': 'knowledge_catalog', 'input': {'subject': 'team'}})
 
+    def test_status_uses_existing_scoped_host_connection(self):
+        result, build = self.invoke({'MYANC_CRM_ACTION_TOKEN': 'fixture'}, 'knowledge_status', '{"approval_id":"fixture"}')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(json.loads(build.return_value.open.call_args.args[0].data),
+                         {'command': 'knowledge_status', 'input': {'approval_id': 'fixture'}})
+
     def test_isolated_session_uses_existing_gateway_action_token(self):
         # The deployed paired gateway injects one token under both names, but
         # its run_as_user filter/sudo env_keep only retain the existing name.

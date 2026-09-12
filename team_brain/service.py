@@ -1,4 +1,4 @@
-"""Host-owned knowledge lifecycle; the model can only search, read and propose."""
+"""Host-owned knowledge lifecycle; model tools cannot approve or execute."""
 
 import difflib
 import hmac
@@ -56,6 +56,9 @@ class Brain:
 
     def tool(self, command, value, principal, session_token):
         owner = self.owner(principal, session_token)
+        if command == "knowledge_status":
+            fields(value, ("approval_id",))
+            return self.proposal_status(value["approval_id"], principal)
         if command == "knowledge_catalog":
             fields(value, ("subject",), ("page_token",))
             subject = text(value["subject"], 100)
@@ -227,6 +230,32 @@ class Brain:
         if check_card:
             require(proposal["card"] and proposal["card"] == principal.message_id, "card_mismatch")
         return proposal
+
+    def proposal_status(self, proposal_id, principal):
+        p = self.owned(proposal_id, principal)
+        now = self.clock()
+        state = "expired" if p["state"] == "pending" and now >= p["expires"] else p["state"]
+        summaries = {
+            "pending": ("待确认；是否可操作以当前确认卡片为准。", "review_card"),
+            "cancelled": ("已取消，不会发布。", "none"),
+            "needs_revision": ("需要修改草稿后重新提交；本提案不会发布。", "revise"),
+            "expired": ("提案已过期，需要重新核对内容后提交新草稿。", "revise"),
+            "conflict": ("页面内容发生冲突，需要重读并重新审阅；本提案未执行写入。", "revise"),
+            "verified": ("提案已发布并核对；当前页面内容需另行读取。", "none"),
+            "claimed": ("提案正在处理，结果待核对；请勿重复确认或提交。", "reconcile"),
+            "executing": ("提案正在执行，结果待核对；请勿重复确认或提交。", "reconcile"),
+            "unknown": ("执行结果不明，需要管理员核对；请勿重复确认或提交。", "reconcile"),
+        }
+        require(state in summaries, "unknown_proposal_state")
+        summary, next_action = summaries[state]
+        if state == "pending" and not p["card"]:
+            summary, next_action = "提案待确认，但确认卡片尚未绑定，请核对卡片送达情况。", "reconcile"
+        receipt = p.get("receipt")
+        return {"status": "ok", "observed_at": now, "proposal": {
+            "approval_id": p["id"], "title": p["title"], "state": state,
+            "summary": summary, "next_action": next_action,
+            "receipt": {key: receipt[key] for key in ("url", "revision", "verified_at")}
+                       if state == "verified" and receipt else None}}
 
     def bind(self, proposal_id, principal):
         with self.journal.transaction():

@@ -15,7 +15,12 @@ JSON
 team-brain-tool knowledge_propose <<'JSON'
 {"title":"虚构客户访谈", "subject":"synthetic-customer-a", "statements":[{"text":"系统现阶段只能导出 Excel。", "evidence":"partner_report", "quote":"系统现阶段只能导出 Excel。", "source":{"submitted_text":"系统现阶段只能导出 Excel。", "label":"虚构访谈逐字稿"}}]}
 JSON
+team-brain-tool knowledge_status <<'JSON'
+{"approval_id":"先前提交结果中的真实编号"}
+JSON
 ```
+
+`knowledge_status` 只接受 `approval_id`，读取当前宿主账本，不调用飞书、不修改提案或发布内容。编号来自本会话的提交结果；宿主校验账号、聊天、会话键及项目，不能查询他人的提案。返回顶层 `status: ok` 代表查询成功，实际提案状态在 `proposal.state`，配有日常说法 `summary`、下一步 `next_action` 和本次 `observed_at`。只向成员展示必要结论，不展示编号、状态枚举或时间戳。待确认提案即使已到期也只返回有效的过期状态，不改写旧账本；处理中和结果不明不会因超时变成可重新批准。已发布回执只证明当时发布核对成功，当前正文仍按 [Skill 的状态问答规则](../SKILL.md)另读。工具没有批准、取消、执行或全员提案列表能力。
 
 来源二选一：`source: {node_token}` 引用本会话刚读过、内容未变的正式页面；`source: {submitted_text, label}` 提供用户选择提交的文字或现成逐字稿。发表的是引文及来源说明；整份输入不自动归档。事实必须与引文一致，假设可以解释引文。来源类别由提交者核对，代码只能验证引文匹配，不能证明发言者身份或事实真伪。
 
