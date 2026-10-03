@@ -50,12 +50,28 @@ class HostSecurity(unittest.TestCase):
         self.assertEqual((self.state / "team-brain.sqlite3").stat().st_mode & 0o077, 0)
         self.config["principals"] = self.config["principals"][:5]
         self.write_config()
-        with self.assertRaisesRegex(BrainError, "six_environments_required"):
+        with self.assertRaisesRegex(BrainError, "four_or_six_environments_required"):
             open_brain(self.config_path)
         self.config["principals"] = [PRINCIPALS[0].identity()] * 6
         self.write_config()
         with self.assertRaisesRegex(BrainError, "invalid_environment_mapping"):
             open_brain(self.config_path)
+
+    def test_two_account_mapping_and_protected_subject_policy(self):
+        self.config['principals'] = [p.identity() for p in PRINCIPALS[:4]]
+        self.config['subject_access'] = [{'principal': p.identity(), 'subjects': ['team', 'management']
+                                        if p == PRINCIPALS[0] else ['team']} for p in PRINCIPALS[:4]]
+        self.write_config()
+        brain = open_brain(self.config_path)
+        self.addCleanup(brain.journal.close)
+        brain.authorize_subject(PRINCIPALS[0], 'management')
+        with self.assertRaisesRegex(BrainError, 'subject_not_accessible'):
+            brain.authorize_subject(PRINCIPALS[1], 'management')
+        for bad in (None, [], self.config['subject_access'][:-1]):
+            self.config['subject_access'] = bad
+            self.write_config()
+            with self.assertRaisesRegex(BrainError, 'invalid_subject_access'):
+                open_brain(self.config_path)
 
 
 if __name__ == "__main__":

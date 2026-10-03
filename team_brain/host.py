@@ -31,20 +31,29 @@ def protected(path, directory=False):
 
 def open_brain(config_path):
     config = strict_json(protected(config_path).read_text(encoding="utf-8"))
-    fields(config, ("app_id", "app_secret", "space_id", "root_node", "wiki_origin", "state_directory", "principals"))
+    fields(config, ("app_id", "app_secret", "space_id", "root_node", "wiki_origin", "state_directory", "principals"),
+           ("subject_access",))
+    require("subject_access" not in config or config["subject_access"] is not None, "invalid_subject_access")
     state = protected(config["state_directory"], True)
-    require(isinstance(config["principals"], list) and len(config["principals"]) == 6, "six_environments_required")
+    require(isinstance(config["principals"], list) and len(config["principals"]) in (4, 6),
+            "four_or_six_environments_required")
     principals = [Principal.parse(p) for p in config["principals"]]
-    require(len({p.key for p in principals}) == 6 and len({p.user_id for p in principals}) == 3 and
-            len({p.project for p in principals}) == 6 and all(p.platform == "feishu" for p in principals),
+    count = len(principals)
+    require(len({p.key for p in principals}) == count and len({p.user_id for p in principals}) == count // 2 and
+            len({p.project for p in principals}) == count and all(p.platform == "feishu" for p in principals),
             "invalid_environment_mapping")
     os.umask(0o077)
     database = state / "team-brain.sqlite3"
     if database.exists():
         protected(database)
     journal = Journal(database)
-    return Brain(journal, Feishu(config["app_id"], config["app_secret"], config["space_id"],
-                               config["root_node"], config["wiki_origin"]), principals)
+    try:
+        return Brain(journal, Feishu(config["app_id"], config["app_secret"], config["space_id"],
+                                   config["root_node"], config["wiki_origin"]), principals,
+                     subject_access=config.get("subject_access"))
+    except Exception:
+        journal.close()
+        raise
 
 
 def dispatch(brain, envelope):

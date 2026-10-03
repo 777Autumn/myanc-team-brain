@@ -5,8 +5,8 @@
 Use the existing Feishu bot to prepare customer meetings, capture submitted text,
 Feishu documents or existing transcripts, preview proposed Wiki changes, publish
 after the submitting member confirms, and reuse the published knowledge next time.
-Three members share the same explicitly configured team knowledge space while the
-existing six conversation environments remain isolated. Banquet business is the
+Two or three members share the explicitly configured team knowledge space while
+their four or six conversation environments remain isolated. Banquet business is the
 initial topic; generic FDE methods remain reusable.
 
 Feishu Wiki is canonical. The private GitHub repository contains code, generic
@@ -31,6 +31,31 @@ team versions. Never scan or synchronize the personal workspace or chat history.
   remains explicit. Distinct customer subjects must not be silently merged.
 
 ## Host boundaries
+
+The protected host configuration may enable `subject_access`: a complete list of
+`{"principal": <trusted transport identity>, "subjects": ["team", ...]}` entries,
+one per configured conversation principal. Subject names alone never grant access.
+An enabled policy rejects unknown subjects before search, metadata, body reads or
+proposal creation. Status, binding, approval and execution recheck the stored
+proposal subject against the current policy. A manager's private and group
+principals are distinct grants. Missing/duplicate entries and null policies fail
+closed; omitting the field retains the legacy shared-knowledge contract and must
+not be described as confidential-subject protection.
+
+`team` remains explicitly shared with all configured principals. Restricted pages
+must be registered under their restricted subject, never `team`. Exact IDs,
+references, search results and proposal sources still pass the existing registry
+subject checks. A two-account fixture grants `management` only to the manager's
+private principal, and `team` to all four principals. This is a host policy for the
+existing service identity, not proof of end-user Feishu ACL inheritance. Direct
+Feishu access must remain separately scoped. Already delivered text, files and
+conversation history cannot be recalled by this policy; permission revocation
+requires handling those existing artifacts before reusing a session.
+The existing publisher creates pages under a shared Wiki root, so proposals for
+subjects not granted to every configured principal are blocked. Read authorization
+does not establish private native publication permissions. This patch does not
+enable confidential publishing; shared-subject publication keeps its existing
+approval lifecycle.
 
 Use Feishu's native document search with a host-fixed Wiki space filter, preserving
 its ranking and opaque pagination. Search accepts a nonblank query of at most 30
