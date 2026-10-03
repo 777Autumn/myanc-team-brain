@@ -7,7 +7,7 @@ import time
 import urllib.parse
 import uuid
 
-from .contracts import BrainError, EVIDENCE, block_text, canonical, digest, fields, paragraphs, require, text, token
+from .contracts import BrainError, EVIDENCE, Principal, block_text, canonical, digest, fields, paragraphs, require, text, token
 
 
 def fingerprint(snapshot):
@@ -19,12 +19,35 @@ def bodyprint(snapshot):
 
 
 class Brain:
-    def __init__(self, journal, api, allowed_principals, clock=time.time):
+    def __init__(self, journal, api, allowed_principals, clock=time.time, *, subject_access=None):
         self.journal, self.api, self.clock = journal, api, clock
         self.allowed = {p.key for p in allowed_principals}
+        self.subject_access = None
+        if subject_access is not None:
+            require(isinstance(subject_access, list), "invalid_subject_access")
+            access = {}
+            for entry in subject_access:
+                fields(entry, ("principal", "subjects"))
+                key = Principal.parse(entry["principal"]).key
+                subjects = entry["subjects"]
+                require(key in self.allowed and key not in access and isinstance(subjects, list),
+                        "invalid_subject_access")
+                for subject in subjects:
+                    text(subject, 100)
+                # Published team pages are shared by the existing readable() contract.
+                require("team" in subjects and len(set(subjects)) == len(subjects), "invalid_subject_access")
+                access[key] = frozenset(subjects)
+            require(set(access) == self.allowed, "invalid_subject_access")
+            self.subject_access = access
 
     def authorize(self, principal):
         require(principal.key in self.allowed, "principal_mismatch")
+
+    def authorize_subject(self, principal, subject):
+        self.authorize(principal)
+        text(subject, 100)
+        require(self.subject_access is None or subject in self.subject_access[principal.key],
+                "subject_not_accessible")
 
     def owner(self, principal, session_token):
         self.authorize(principal)
@@ -56,9 +79,13 @@ class Brain:
 
     def tool(self, command, value, principal, session_token):
         owner = self.owner(principal, session_token)
+        require(command in ("knowledge_status", "knowledge_catalog", "knowledge_search",
+                            "knowledge_read", "knowledge_propose"), "unsupported_command")
         if command == "knowledge_status":
             fields(value, ("approval_id",))
             return self.proposal_status(value["approval_id"], principal)
+        require(isinstance(value, dict))
+        self.authorize_subject(principal, value.get("subject"))
         if command == "knowledge_catalog":
             fields(value, ("subject",), ("page_token",))
             subject = text(value["subject"], 100)
@@ -227,6 +254,7 @@ class Brain:
         self.authorize(principal)
         proposal = self.journal.get(token(proposal_id))
         require(proposal["actor"] == principal.key, "principal_mismatch")
+        self.authorize_subject(principal, proposal["subject"])
         if check_card:
             require(proposal["card"] and proposal["card"] == principal.message_id, "card_mismatch")
         return proposal
