@@ -67,15 +67,34 @@ class SubjectAccess(unittest.TestCase):
         self.api.snapshot.assert_not_called()
 
     def test_revocation_blocks_old_proposal_status_and_execution(self):
-        proposal = self.brain.tool('knowledge_propose', material(subject='management'), self.manager, 's')
+        # An old pending proposal is not a grant after a policy is enabled.
+        legacy = Brain(self.journal, self.api, PRINCIPALS)
+        proposal = legacy.tool('knowledge_propose', material(subject='management'), self.manager, 's')
         callback = replace(self.manager, message_id='synthetic-card')
-        self.brain.bind(proposal['approval_id'], callback)
-        self.brain.claim(proposal['approval_id'], 'approve', callback)
+        legacy.bind(proposal['approval_id'], callback)
+        legacy.claim(proposal['approval_id'], 'approve', callback)
         restricted = [{'principal': p.identity(), 'subjects': ['team']} for p in PRINCIPALS]
         current = Brain(self.journal, self.api, PRINCIPALS, subject_access=restricted)
         for invoke in (current.proposal_status, current.execute):
             with self.assertRaisesRegex(BrainError, 'subject_not_accessible'):
                 invoke(proposal['approval_id'], callback)
+        self.assertEqual(self.api.writes, 0)
+
+    def test_restricted_publication_does_not_create_shared_root_page(self):
+        with self.assertRaisesRegex(BrainError, 'restricted_publication_not_supported'):
+            self.brain.tool('knowledge_propose', material(subject='management'), self.manager, 's')
+        self.assertEqual(self.api.writes, 0)
+        self.assertEqual(self.brain.tool('knowledge_propose', material(subject='team'),
+                                        self.employee, 's')['status'], 'pending')
+
+    def test_pre_policy_claim_cannot_publish_even_if_manager_retains_read_access(self):
+        legacy = Brain(self.journal, self.api, PRINCIPALS)
+        proposal = legacy.tool('knowledge_propose', material(subject='management'), self.manager, 's')
+        callback = replace(self.manager, message_id='synthetic-card')
+        legacy.bind(proposal['approval_id'], callback)
+        legacy.claim(proposal['approval_id'], 'approve', callback)
+        with self.assertRaisesRegex(BrainError, 'restricted_publication_not_supported'):
+            self.brain.execute(proposal['approval_id'], callback)
         self.assertEqual(self.api.writes, 0)
 
     def test_malformed_or_incomplete_policy_fails_closed(self):

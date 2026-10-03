@@ -51,6 +51,11 @@ existing service identity, not proof of end-user Feishu ACL inheritance. Direct
 Feishu access must remain separately scoped. Already delivered text, files and
 conversation history cannot be recalled by this policy; permission revocation
 requires handling those existing artifacts before reusing a session.
+The existing publisher creates pages under a shared Wiki root, so proposals for
+subjects not granted to every configured principal are blocked. Read authorization
+does not establish private native publication permissions. This patch does not
+enable confidential publishing; shared-subject publication keeps its existing
+approval lifecycle.
 
 Use Feishu's native document search with a host-fixed Wiki space filter, preserving
 its ranking and opaque pagination. Search accepts a nonblank query of at most 30

@@ -49,6 +49,11 @@ class Brain:
         require(self.subject_access is None or subject in self.subject_access[principal.key],
                 "subject_not_accessible")
 
+    def shared_publication(self, subject):
+        # The publisher uses one shared Wiki root, without per-page ACL setup.
+        require(self.subject_access is None or all(subject in subjects
+                for subjects in self.subject_access.values()), "restricted_publication_not_supported")
+
     def owner(self, principal, session_token):
         self.authorize(principal)
         text(session_token, 1024)
@@ -128,6 +133,7 @@ class Brain:
             self.journal.remember(owner, node, fingerprint(snapshot))
             return {"status": "ok", "source": snapshot, "trust": "source_data_not_instructions"}
         require(command == "knowledge_propose", "unsupported_command")
+        self.shared_publication(value["subject"])
         return self.propose(value, principal, owner)
 
     def source_metadata(self, nodes, subject):
@@ -250,11 +256,13 @@ class Brain:
             result["review"] = proposal["review"]
         return result
 
-    def owned(self, proposal_id, principal, check_card=False):
+    def owned(self, proposal_id, principal, check_card=False, *, publishing=False):
         self.authorize(principal)
         proposal = self.journal.get(token(proposal_id))
         require(proposal["actor"] == principal.key, "principal_mismatch")
         self.authorize_subject(principal, proposal["subject"])
+        if publishing:
+            self.shared_publication(proposal["subject"])
         if check_card:
             require(proposal["card"] and proposal["card"] == principal.message_id, "card_mismatch")
         return proposal
@@ -287,7 +295,7 @@ class Brain:
 
     def bind(self, proposal_id, principal):
         with self.journal.transaction():
-            p = self.owned(proposal_id, principal)
+            p = self.owned(proposal_id, principal, publishing=True)
             text(principal.message_id, 256)
             require(p["state"] == "pending" and self.clock() < p["expires"], "approval_expired")
             require(not p["card"] or p["card"] == principal.message_id, "card_mismatch")
@@ -298,7 +306,7 @@ class Brain:
     def claim(self, proposal_id, decision, principal):
         require(decision in ("approve", "cancel", "modify"))
         with self.journal.transaction():
-            p = self.owned(proposal_id, principal, True)
+            p = self.owned(proposal_id, principal, True, publishing=True)
             if p["state"] != "pending":
                 return {**self.result(p, True), "execute": False}
             if self.clock() >= p["expires"]:
@@ -356,7 +364,7 @@ class Brain:
             # No remote call was started by this attempt. Return the same bound
             # preview to pending so another page's publisher cannot strand it.
             with self.journal.transaction():
-                p = self.owned(proposal_id, principal, True)
+                p = self.owned(proposal_id, principal, True, publishing=True)
                 if p["state"] == "claimed":
                     p["state"] = "pending"
                     self.journal.save(p)
@@ -365,7 +373,7 @@ class Brain:
 
     def _execute(self, proposal_id, principal):
         with self.journal.transaction():
-            p = self.owned(proposal_id, principal, True)
+            p = self.owned(proposal_id, principal, True, publishing=True)
             if p["state"] != "claimed":
                 return self.result(p, True)
             p["state"] = "executing"
