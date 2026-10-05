@@ -8,7 +8,7 @@ import unittest
 from team_brain.contracts import BrainError, paragraph
 from team_brain.journal import Journal
 from team_brain.service import Brain
-from tests.fakes import FakeFeishu, PRINCIPALS
+from tests.fakes import FakeFeishu, PRINCIPALS, member_principals
 from tests.test_lifecycle import material
 
 
@@ -102,3 +102,31 @@ class SubjectAccess(unittest.TestCase):
                         [dict(entry, subjects=['management']) for entry in self.access]):
             with self.subTest(entries=entries), self.assertRaises(BrainError):
                 Brain(self.journal, self.api, PRINCIPALS, subject_access=entries)
+
+    def test_two_to_five_members_keep_subjects_and_approvals_isolated(self):
+        for count in (2, 3, 4, 5):
+            principals = member_principals(count)
+            policy = [{'principal': p.identity(), 'subjects': ['team', 'management']
+                       if p == principals[0] else ['team']} for p in principals]
+            brain = Brain(self.journal, self.api, principals, subject_access=policy)
+            self.assertIn('FICTIONAL-MARGIN', str(brain.tool('knowledge_read',
+                          {'subject': 'management', 'node_token': 'restricted'}, principals[0], 'session')))
+            proposal = brain.tool('knowledge_propose', material(subject='team'), principals[0], 'session')
+            for actor in principals[1:]:
+                self.api.snapshot.reset_mock()
+                with self.assertRaisesRegex(BrainError, 'subject_not_accessible'):
+                    brain.tool('knowledge_read', {'subject': 'management', 'node_token': 'restricted'}, actor, 'session')
+                self.api.snapshot.assert_not_called()
+                self.assertIn('FICTIONAL-SETUP', str(brain.tool('knowledge_read',
+                              {'subject': 'team', 'node_token': 'ordinary'}, actor, 'session')))
+                callback = replace(actor, message_id='fixture-card')
+                for call in (lambda: brain.proposal_status(proposal['approval_id'], actor),
+                             lambda: brain.bind(proposal['approval_id'], callback),
+                             lambda: brain.claim(proposal['approval_id'], 'approve', callback),
+                             lambda: brain.execute(proposal['approval_id'], callback)):
+                    with self.assertRaises(BrainError):
+                        call()
+            for invalid in (policy[:-1], policy + policy[:1]):
+                with self.assertRaisesRegex(BrainError, 'invalid_subject_access'):
+                    Brain(self.journal, self.api, principals, subject_access=invalid)
+            self.assertEqual(0, self.api.writes)
