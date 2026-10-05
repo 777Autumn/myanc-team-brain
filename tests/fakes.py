@@ -4,8 +4,12 @@ from team_brain.contracts import BrainError, Principal, block_text
 from team_brain.feishu import Feishu
 
 
-PRINCIPALS = [Principal("feishu", "member" + str(n), kind + str(n), kind + ":" + str(n),
-                        "project-" + kind + str(n)) for n in range(3) for kind in ("private", "group")]
+def member_principals(count):
+    return [Principal("feishu", "member" + str(n), kind + str(n), kind + ":" + str(n),
+                      "project-" + kind + str(n)) for n in range(count) for kind in ("private", "group")]
+
+
+PRINCIPALS = member_principals(3)
 
 
 class FakeFeishu:

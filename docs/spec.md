@@ -5,8 +5,11 @@
 Use the existing Feishu bot to prepare customer meetings, capture submitted text,
 Feishu documents or existing transcripts, preview proposed Wiki changes, publish
 after the submitting member confirms, and reuse the published knowledge next time.
-Two or three members share the explicitly configured team knowledge space while
-their four or six conversation environments remain isolated. Banquet business is the
+Two to five members share the explicitly configured team knowledge space while
+their four to ten conversation environments remain isolated (exactly two per member).
+The protected gateway mapping identifies private and group entrances; names do not grant access.
+Synthetic tests cover this capacity; current live acceptance uses two real accounts.
+Banquet business is the
 initial topic; generic FDE methods remain reusable.
 
 Feishu Wiki is canonical. The private GitHub repository contains code, generic
@@ -161,5 +164,7 @@ source grounding, missing evidence, separate customers, the distinction between
 system-user and employee counts and between Excel export and an API, private-source
 exclusion, unapproved/duplicate/expired approvals, stale previews, concurrent writes,
 timeouts/partial writes, restart reconciliation, and gateway identity isolation.
-Live tenant capability and the three-person real workflow remain release acceptance
-steps, never inferred from mock tests or a successful build.
+Live tenant capability and the approved two-account real workflow remain release
+acceptance steps, never inferred from mock tests or a successful build. Adding
+real members requires their own gateway mapping, subject policy and authorization;
+five-member fixture coverage is not five-member live or load-test evidence.

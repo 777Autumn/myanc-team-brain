@@ -1,6 +1,7 @@
 """Private subprocess entry point. Install only in the trusted host environment."""
 
 import argparse
+from collections import Counter
 import json
 import os
 from pathlib import Path
@@ -35,11 +36,11 @@ def open_brain(config_path):
            ("subject_access",))
     require("subject_access" not in config or config["subject_access"] is not None, "invalid_subject_access")
     state = protected(config["state_directory"], True)
-    require(isinstance(config["principals"], list) and len(config["principals"]) in (4, 6),
-            "four_or_six_environments_required")
+    require(isinstance(config["principals"], list) and len(config["principals"]) in (4, 6, 8, 10),
+            "two_to_five_members_required")
     principals = [Principal.parse(p) for p in config["principals"]]
     count = len(principals)
-    require(len({p.key for p in principals}) == count and len({p.user_id for p in principals}) == count // 2 and
+    require(len({p.key for p in principals}) == count and set(Counter(p.user_id for p in principals).values()) == {2} and
             len({p.project for p in principals}) == count and all(p.platform == "feishu" for p in principals),
             "invalid_environment_mapping")
     os.umask(0o077)
