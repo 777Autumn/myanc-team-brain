@@ -33,14 +33,21 @@ def protected(path, directory=False):
 def open_brain(config_path):
     config = strict_json(protected(config_path).read_text(encoding="utf-8"))
     fields(config, ("app_id", "app_secret", "space_id", "root_node", "wiki_origin", "state_directory", "principals"),
-           ("subject_access",))
+           ("subject_access", "member_bindings"))
     require("subject_access" not in config or config["subject_access"] is not None, "invalid_subject_access")
     state = protected(config["state_directory"], True)
     require(isinstance(config["principals"], list) and len(config["principals"]) in (4, 6, 8, 10),
             "two_to_five_members_required")
     principals = [Principal.parse(p) for p in config["principals"]]
     count = len(principals)
-    require(len({p.key for p in principals}) == count and set(Counter(p.user_id for p in principals).values()) == {2} and
+    members = [p.user_id for p in principals]
+    if "member_bindings" in config:
+        bindings = config["member_bindings"]
+        require(isinstance(bindings, dict) and set(bindings) == {p.key for p in principals},
+                "invalid_member_bindings")
+        members = [text(bindings[p.key], 256) for p in principals]
+        require(all(member.strip() for member in members), "invalid_member_bindings")
+    require(len({p.key for p in principals}) == count and set(Counter(members).values()) == {2} and
             len({p.project for p in principals}) == count and all(p.platform == "feishu" for p in principals),
             "invalid_environment_mapping")
     os.umask(0o077)
@@ -62,6 +69,9 @@ def dispatch(brain, envelope):
     principal = Principal.parse(envelope["principal"])
     operation = envelope["operation"]
     common = ("operation", "principal")
+    if operation == "pending":
+        fields(envelope, common)
+        return brain.pending(principal)
     if operation == "tool":
         fields(envelope, common + ("command", "input", "session_token"))
         return brain.tool(envelope["command"], envelope["input"], principal, envelope["session_token"])

@@ -4,13 +4,21 @@ import json
 import unittest
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 from team_brain import tool
 
 
 class ToolSessionTests(unittest.TestCase):
+    def test_pending_is_not_an_unprivileged_caller_command(self):
+        with patch.object(tool.sys, 'argv', ['team-brain-tool', 'pending']), \
+                patch.object(tool.urllib.request, 'build_opener') as build, \
+                redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            tool.main()
+        self.assertEqual(error.exception.code, 2)
+        build.assert_not_called()
+
     def invoke(self, environment, command='knowledge_search', raw='{"query":"fictional","subject":"team"}'):
         output = io.StringIO()
         with patch.dict(tool.os.environ, {'HTTP_PROXY': 'http://127.0.0.1:18080', **environment}, clear=True), \
