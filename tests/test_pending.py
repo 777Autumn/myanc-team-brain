@@ -38,10 +38,12 @@ class PendingActions(unittest.TestCase):
 
     def assert_read_only_pending(self, expected):
         rows = list(self.brain.journal.db.execute("SELECT body FROM proposals"))
+        changes = self.brain.journal.db.total_changes
         writes = self.api.writes
         self.assertEqual(self.pending(), {"pending": expected})
         self.assertEqual([tuple(r) for r in self.brain.journal.db.execute("SELECT body FROM proposals")],
                          [tuple(r) for r in rows])
+        self.assertEqual(self.brain.journal.db.total_changes, changes)
         self.assertEqual(self.api.writes, writes)
 
     def test_pending_claimed_verified_survive_restart_without_execution(self):
@@ -59,19 +61,72 @@ class PendingActions(unittest.TestCase):
                 self.reopen()
                 self.assert_read_only_pending(state != "verified")
 
-    def test_expiry_including_claimed_is_projected_without_mutation(self):
+    def test_pending_expiry_is_projected_without_mutation(self):
+        identifier = self.stage()
+        expires = self.brain.journal.get(identifier)["expires"]
+        for offset, expected in ((-1, True), (0, False), (1, False)):
+            self.now = expires + offset
+            with self.subTest(offset=offset):
+                self.reopen()
+                self.assert_read_only_pending(expected)
+
+    def test_expired_claim_blocks_until_reconcile_resolves_it(self):
         identifier = self.stage()
         self.brain.bind(identifier, self.callback)
         self.brain.claim(identifier, "approve", self.callback)
-        for state in ("pending", "claimed"):
-            p = self.brain.journal.get(identifier)
-            p["state"] = state
-            self.brain.journal.save(p)
-            for offset, expected in ((-1, True), (0, False), (1, False)):
-                self.now = p["expires"] + offset
-                with self.subTest(state=state, offset=offset):
-                    self.reopen()
-                    self.assert_read_only_pending(expected)
+        self.now = self.brain.journal.get(identifier)["expires"] + 1
+        self.reopen()
+        self.assertEqual(self.brain.journal.get(identifier)["state"], "claimed")
+        self.assert_read_only_pending(True)
+        self.assertEqual(self.pending(PRINCIPALS[1]), {"pending": False})
+        self.assertIsNotNone(self.brain.journal.locked("create:" + self.api.root_node))
+        self.assertEqual(self.brain.reconcile(identifier)["status"], "expired")
+        self.assertIsNone(self.brain.journal.locked("create:" + self.api.root_node))
+        self.assert_read_only_pending(False)
+
+    def test_executing_publication_blocks_even_after_expiry(self):
+        identifier = self.stage()
+        self.brain.bind(identifier, self.callback)
+        self.brain.claim(identifier, "approve", self.callback)
+        append = self.api.append
+        observations = []
+
+        def observe_execution(document_id, blocks, operation_id):
+            self.now = self.brain.journal.get(identifier)["expires"] + 1
+            journal = Journal(self.path)
+            try:
+                observer = Brain(journal, self.api, PRINCIPALS, lambda: self.now)
+                observations.append((journal.get(identifier)["state"], observer.pending(self.actor),
+                                     observer.pending(PRINCIPALS[1]), journal.locked(document_id) is not None))
+            finally:
+                journal.close()
+            append(document_id, blocks, operation_id)
+
+        self.api.append = observe_execution
+        self.assertEqual(self.brain.execute(identifier, self.callback)["status"], "verified")
+        self.assertEqual(observations, [("executing", {"pending": True}, {"pending": False}, True)])
+        self.assert_read_only_pending(False)
+
+    def test_unknown_survives_restart_and_expiry_until_reconcile(self):
+        identifier = self.stage()
+        self.brain.bind(identifier, self.callback)
+        self.brain.claim(identifier, "approve", self.callback)
+        self.api.failure = "append"
+        self.assertEqual(self.brain.execute(identifier, self.callback)["status"], "unknown")
+        for expired in (False, True):
+            if expired:
+                self.now = self.brain.journal.get(identifier)["expires"] + 1
+            self.reopen()
+            with self.subTest(expired=expired):
+                self.assert_read_only_pending(True)
+                self.assertEqual(self.pending(PRINCIPALS[1]), {"pending": False})
+                self.assertIsNotNone(self.brain.journal.locked("create:" + self.api.root_node))
+        writes = self.api.writes
+        self.assertEqual(self.brain.reconcile(identifier)["status"], "verified")
+        self.assertEqual(self.api.writes, writes)
+        self.assertIsNone(self.brain.journal.locked("create:" + self.api.root_node))
+        self.reopen()
+        self.assert_read_only_pending(False)
 
     def test_exact_physical_principal_across_all_work_tokens(self):
         identifier = self.stage("earlier-work")
@@ -91,9 +146,9 @@ class PendingActions(unittest.TestCase):
         with self.assertRaisesRegex(BrainError, "principal_mismatch"):
             self.pending(replace(self.actor, user_id="unconfigured"))
 
-    def test_terminal_and_uncertain_states_are_not_pending_approvals(self):
+    def test_terminal_states_do_not_block(self):
         identifier = self.stage()
-        for state in ("cancelled", "needs_revision", "expired", "conflict", "verified", "executing", "unknown"):
+        for state in ("cancelled", "needs_revision", "expired", "conflict", "verified"):
             p = self.brain.journal.get(identifier)
             p["state"] = state
             self.brain.journal.save(p)

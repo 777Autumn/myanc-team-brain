@@ -131,8 +131,11 @@ recording/transcription or whole-chat collection in v1.
 ### Proposal status follow-up repair
 
 The private host also accepts `pending` with only the authenticated Principal.
-It returns only `{ "pending": boolean }` for unexpired `pending` or `claimed`
-proposals owned by that exact physical principal across all work/session tokens.
+It returns only `{ "pending": boolean }` for unexpired `pending` proposals or
+any `claimed`, `executing` or `unknown` proposals owned by that exact physical
+principal across all work/session tokens. Approval expiry cannot release a
+claimed or uncertain publication: it blocks until the existing execution or
+reconcile flow resolves its state. Terminal states do not block work switching.
 This read-only journal query does not execute, claim, expire or reveal a proposal;
 it is unavailable through model tools and supports the gateway's work-switch guard.
 

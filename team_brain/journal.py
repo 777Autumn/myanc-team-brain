@@ -66,8 +66,10 @@ class Journal:
     def pending(self, actor, now):
         for row in self.db.execute("SELECT body FROM proposals"):
             proposal = json.loads(row[0])
-            if (proposal["actor"] == actor and proposal["state"] in ("pending", "claimed")
-                    and proposal["expires"] > now):
+            # Approval expiry cannot resolve a claimed or possibly written action.
+            if (proposal["actor"] == actor and
+                    (proposal["state"] in ("claimed", "executing", "unknown") or
+                     proposal["state"] == "pending" and proposal["expires"] > now)):
                 return True
         return False
 
