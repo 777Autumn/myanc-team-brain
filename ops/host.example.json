@@ -6,11 +6,15 @@
   "wiki_origin": "https://example.feishu.cn",
   "state_directory": "/var/lib/team-brain/state",
   "principals": [
-    {"platform":"feishu","user_id":"synthetic-member-1","chat_id":"synthetic-private-1","session_key":"synthetic:private:1","project":"synthetic-private-1"},
-    {"platform":"feishu","user_id":"synthetic-member-1","chat_id":"synthetic-group-1","session_key":"synthetic:group:1","project":"synthetic-group-1"},
-    {"platform":"feishu","user_id":"synthetic-member-2","chat_id":"synthetic-private-2","session_key":"synthetic:private:2","project":"synthetic-private-2"},
-    {"platform":"feishu","user_id":"synthetic-member-2","chat_id":"synthetic-group-2","session_key":"synthetic:group:2","project":"synthetic-group-2"},
-    {"platform":"feishu","user_id":"synthetic-member-3","chat_id":"synthetic-private-3","session_key":"synthetic:private:3","project":"synthetic-private-3"},
-    {"platform":"feishu","user_id":"synthetic-member-3","chat_id":"synthetic-group-3","session_key":"synthetic:group:3","project":"synthetic-group-3"}
-  ]
+    {"platform":"feishu","user_id":"synthetic-private-member-1","chat_id":"synthetic-private-1","session_key":"synthetic:private:1","project":"synthetic-private-1"},
+    {"platform":"feishu","user_id":"synthetic-group-member-1","chat_id":"synthetic-shared-group","session_key":"synthetic:group:1","project":"synthetic-group-1"},
+    {"platform":"feishu","user_id":"synthetic-private-member-2","chat_id":"synthetic-private-2","session_key":"synthetic:private:2","project":"synthetic-private-2"},
+    {"platform":"feishu","user_id":"synthetic-group-member-2","chat_id":"synthetic-shared-group","session_key":"synthetic:group:2","project":"synthetic-group-2"}
+  ],
+  "member_bindings": {
+    "c32c468414392e76b4d455c585c69d83e906959518ef74b09cef97e479e562dd": "synthetic-group-member-1",
+    "1eafd0cc546ffc964d88904cff6762a7e5ce633509b0ac21c128f41dcaa6d8ff": "synthetic-group-member-1",
+    "347c0bcff42afd1d1ce7add95d2358f8238cec71fae99a9b4456b3c48a73cb41": "synthetic-group-member-2",
+    "55e75ce57afe84ea08ebbf31c657e356746e2bd8612019154d40cc860f549a12": "synthetic-group-member-2"
+  }
 }

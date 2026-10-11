@@ -43,6 +43,15 @@ Wiki 节点读取/创建 scope 与 Docx token 的 `obj_type=docx` 参数已用�
 
 `ops/host.example.json` 和包装器均为占位示例，不可直接用于生产。宿主配置文件及祖先目录不可被其他用户写入；模型进程必须使用与宿主不同的、无提权能力的账户。验证每个 Agent 不能读状态/配置、不能运行宿主包装器取得权限、不能访问租户凭据。POSIX 模式检查不能替代 ACL、容器挂载及 sudo 策略核验。
 
+个人 App 私聊加公共 App 共同群的配置使用可选 `member_bindings`，键为
+`Principal.parse(principal).key`（原始五字段规范 JSON 的 SHA-256），值与 CRM
+`routes[].member_id` 一致，沿用公共 Bot 下原成员 `user_id`。维护者须逐项核实
+跨 App 身份对应关系，再完整列出全部 principal 的映射；不能根据姓名推断或只补
+个人入口。示例是两人四入口；仍支持二至五人、每人恰好两入口。省略该字段保留
+旧同 `user_id` 成对校验，显式空值或不完整映射拒绝启动。更新任何身份字段后必须
+重算键并逐入口核对 `subject_access`；成员映射不会继承旧会话、读取回执或审批卡片。
+知识发布仍使用宿主原有应用凭据；新增个人 App 不改变 Wiki 访问范围或业务账本。
+
 具体安装器和分步操作见 [operator-install.md](operator-install.md)。每次发布在受保护的本地材料中固定实际文件、身份、八篇已审阅页面哈希、在线基线和包哈希；这些材料不提交 GitHub。首次登记先读取全部八篇并核对，再在同一事务写入独立账本，任意一篇变化或本地登记失败均不留下部分登记。
 
 网关新增两个宿主环境变量：`CC_TEAM_BRAIN_COMMAND`（受保护的绝对包装器路径），`CC_TEAM_BRAIN_PROJECTS`（恰好六个现有项目名）。启动初期读取并移除，不传给 Agent。共享现有回环工具监听器；无第二公网服务。现有 CRM host 按原逻辑保留，知识 host 通过独立命令和卡片 kind 路由。

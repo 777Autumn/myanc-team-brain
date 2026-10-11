@@ -63,6 +63,16 @@ class Journal:
         self.db.execute("INSERT INTO proposals VALUES (?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body",
                         (proposal["id"], canonical(proposal)))
 
+    def pending(self, actor, now):
+        for row in self.db.execute("SELECT body FROM proposals"):
+            proposal = json.loads(row[0])
+            # Approval expiry cannot resolve a claimed or possibly written action.
+            if (proposal["actor"] == actor and
+                    (proposal["state"] in ("claimed", "executing", "unknown") or
+                     proposal["state"] == "pending" and proposal["expires"] > now)):
+                return True
+        return False
+
     def page(self, node):
         row = self.db.execute("SELECT subject,paused,fingerprint FROM pages WHERE node=?", (node,)).fetchone()
         require(row is not None, "page_not_published")

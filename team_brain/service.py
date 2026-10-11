@@ -267,6 +267,12 @@ class Brain:
             require(proposal["card"] and proposal["card"] == principal.message_id, "card_mismatch")
         return proposal
 
+    def pending(self, principal):
+        self.authorize(principal)
+        # A work/session-token change cannot hide another outstanding approval
+        # owned by this exact physical principal. This is host-only metadata.
+        return {"pending": self.journal.pending(principal.key, self.clock())}
+
     def proposal_status(self, proposal_id, principal):
         p = self.owned(proposal_id, principal)
         now = self.clock()

@@ -35,6 +35,25 @@ team versions. Never scan or synchronize the personal workspace or chat history.
 
 ## Host boundaries
 
+The protected host configuration may supply `member_bindings`, a complete object
+mapping each configured `Principal.key` to the existing member ID (the public
+Bot's original `user_id`, matching CRM `routes[].member_id`). Each key is the
+SHA-256 of the canonical five-field identity: platform, user_id, chat_id,
+session_key and project. The gateway supplies the original physical principal;
+the host does not replace app-specific `open_id` values with member IDs. Explicit
+bindings permit each member's personal App DM and the public App's shared group
+to have different user IDs. Two to five members still have exactly two distinct
+principals and projects each, all on Feishu. Missing/extra/duplicate bindings,
+null policies and uneven membership fail closed. Omitting `member_bindings`
+retains the legacy same-`user_id` pairing check.
+
+Member binding is only an environment validation rule; it grants no knowledge,
+session or approval access. New App principals receive no old read receipts,
+proposal ownership or conversation context automatically. Subject grants and
+card callbacks remain bound to the original complete principal. The fictional
+two-person configuration in `ops/host.example.json` demonstrates four entrances
+and one common public group; real bindings require operator verification.
+
 The protected host configuration may enable `subject_access`: a complete list of
 `{"principal": <trusted transport identity>, "subjects": ["team", ...]}` entries,
 one per configured conversation principal. Subject names alone never grant access.
@@ -110,6 +129,15 @@ recording/transcription or whole-chat collection in v1.
 ## Delivery
 
 ### Proposal status follow-up repair
+
+The private host also accepts `pending` with only the authenticated Principal.
+It returns only `{ "pending": boolean }` for unexpired `pending` proposals or
+any `claimed`, `executing` or `unknown` proposals owned by that exact physical
+principal across all work/session tokens. Approval expiry cannot release a
+claimed or uncertain publication: it blocks until the existing execution or
+reconcile flow resolves its state. Terminal states do not block work switching.
+This read-only journal query does not execute, claim, expire or reveal a proposal;
+it is unavailable through model tools and supports the gateway's work-switch guard.
 
 After cancellation, a model must not infer pending approval from an unchanged
 page. Add knowledge_status(approval_id), a read-only lookup using the existing
